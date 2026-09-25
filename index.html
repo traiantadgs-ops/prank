@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            cursor: pointer;
+            z-index: 9999;
+        }
+        #start-screen h1 {
+            font-size: 22px;
+            color: #fff;
+            margin-bottom: 30px;
+            font-weight: normal;
+        }
+        #green-btn {
+            background: #00cc44;
+            color: #fff;
+            border: none;
+            padding: 18px 40px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
+            transition: 0.3s;
+        }
+        #green-btn:hover {
+            background: #00ff55;
+            box-shadow: 0 0 30px rgba(0, 255, 85, 0.9);
+        }
+        #video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: none;
+        }
+        #video-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="start-screen" onclick="startVideo()">
+        <h1>Загрузка контента...</h1>
+        <button id="green-btn" onclick="event.stopPropagation(); startVideo();">
+            ▶ Нажми, чтобы показать
+        </button>
+    </div>
+
+    <div id="video-container">
+        <iframe id="yt-frame" 
+            src="" 
+            allow="autoplay; fullscreen; encrypted-media"
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <script>
+        var videoId = "hPZxDJYmTUw";
+        var started = false;
+
+        function startVideo() {
+            if (started) return;
+            started = true;
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            
+            var container = document.getElementById('video-container');
+            container.style.display = 'block';
+            
+            var iframe = document.getElementById('yt-frame');
+            iframe.src = "https://www.youtube.com/embed/" + videoId + "?autoplay=1&mute=0&controls=1&rel=0&playsinline=1";
+        }
+    </script>
+</body>
+</html>
