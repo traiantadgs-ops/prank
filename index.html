@@ -2,44 +2,77 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Loading...</title>
     <style>
+        * { box-sizing: border-box; }
         html, body {
             margin: 0; padding: 0; height: 100%;
             background: #000; overflow: hidden;
             font-family: Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
         #start-screen {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
+            position: fixed; inset: 0;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            background: #000; cursor: pointer; z-index: 9999;
+            background: #000; cursor: pointer; z-index: 99999;
+            padding: 20px; text-align: center;
         }
         #start-screen h1 {
-            font-size: 22px; color: #fff; margin-bottom: 30px;
+            font-size: 22px; color: #fff; margin: 0 0 30px;
         }
         #green-btn {
             background: #00cc44; color: #fff; border: none;
             padding: 18px 40px; font-size: 20px;
             border-radius: 8px; cursor: pointer;
             box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
+            font-weight: bold;
         }
-        #green-btn:hover { background: #00ff55; }
-        #video-container {
-            position: fixed; top: 0; left: 0;
+        #green-btn:active { background: #00ff55; transform: scale(0.95); }
+
+        #main-video {
+            position: fixed; inset: 0;
             width: 100%; height: 100%;
-            z-index: 1; display: none; background: #000;
+            object-fit: cover;
+            z-index: 1;
+            display: none;
+            background: #000;
+        }
+
+        .copy-video {
+            position: fixed;
+            width: 45vw;
+            height: 30vh;
+            border: 2px solid red;
+            box-shadow: 0 0 20px red;
+            background: #000;
+            animation: shakeCopy 0.15s infinite;
             overflow: hidden;
         }
-        #yt-player {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        .copy-video video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+            pointer-events: none;
         }
-        .hidden { display: none !important; }
+        .copy-video .sound-btn {
+            position: absolute;
+            top: 0; left: 0;
+            width: 1px; height: 1px;
+            padding: 0; margin: 0; border: none;
+            background: transparent;
+            opacity: 0.001;
+            cursor: pointer;
+            z-index: 9999;
+        }
+        @keyframes shakeCopy {
+            0% { transform: translate(0,0); }
+            25% { transform: translate(2px,2px); }
+            50% { transform: translate(-2px,-2px); }
+            75% { transform: translate(2px,-2px); }
+            100% { transform: translate(0,0); }
+        }
     </style>
 </head>
 <body>
@@ -50,206 +83,135 @@
         </button>
     </div>
 
-    <div id="video-container">
-        <div id="yt-player"></div>
-    </div>
+    <video id="main-video" loop playsinline>
+        <source src="video.mp4" type="video/mp4">
+    </video>
 
     <script>
-        // ============================================================
-        //  YouTube IFrame API
-        // ============================================================
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-
-        var VIDEO_ID = 'b2pD0B9Rfps';
-        var ytPlayer = null;
-        var ytReady = false;
-
         var started = false;
-        var chaosInterval = null;
-        var spamCount = 0;
+        var copyCount = 0;
 
-        // ============================================================
-        //  РАЗРЕШЕНИЕ ЗВУКА — запрашиваем при загрузке страницы
-        // ============================================================
-        function requestSoundPermission() {
-            try {
-                // Создаём AudioContext и резюмируем его — это разрешает звук
-                var AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (AudioContext) {
-                    var ctx = new AudioContext();
-                    if (ctx.state === 'suspended') {
-                        ctx.resume();
-                    }
-                    // Создаём пустой источник, чтобы активировать аудио-контекст
-                    var buffer = ctx.createBuffer(1, 1, 22050);
-                    var source = ctx.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(ctx.destination);
-                    source.start(0);
-                }
-            } catch(e) {}
-
-            // Пробуем разблокировать звук у HTML5-видео
-            try {
-                var v = document.createElement('video');
-                v.muted = false;
-                v.volume = 1.0;
-                v.play().catch(function(){});
-            } catch(e) {}
-
-            // Запрос разрешения на автовоспроизведение (Chrome)
-            try {
-                if (navigator.mediaSession) {
-                    navigator.mediaSession.playbackState = 'playing';
-                }
-            } catch(e) {}
-        }
-
-        // Запускаем запрос сразу
-        requestSoundPermission();
-
-        // И повторяем при первом любом взаимодействии
-        document.addEventListener('click', requestSoundPermission, { once: true });
-        document.addEventListener('touchstart', requestSoundPermission, { once: true });
-        document.addEventListener('keydown', requestSoundPermission, { once: true });
-
-        // ============================================================
-        //  YouTube плеер
-        // ============================================================
-        function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('yt-player', {
-                height: '100%',
-                width: '100%',
-                videoId: VIDEO_ID,
-                playerVars: {
-                    autoplay: 1,           // автозапуск
-                    controls: 0,
-                    loop: 1,
-                    playlist: VIDEO_ID,
-                    modestbranding: 1,
-                    rel: 0,
-                    fs: 0,
-                    iv_load_policy: 3,
-                    mute: 0                 // НЕ приглушать
-                },
-                events: {
-                    'onReady': function(event) {
-                        ytReady = true;
-                        fitYouTubeToScreen();
-                        // Звук сразу на максимум
-                        event.target.setVolume(100);
-                        event.target.unMute();
-                        if (started) {
-                            event.target.playVideo();
-                        }
-                    },
-                    'onStateChange': function(event) {
-                        if (event.data === YT.PlayerState.ENDED) {
-                            ytPlayer.seekTo(0);
-                            ytPlayer.playVideo();
-                        }
-                        // Если плеер заглушили — включаем звук обратно
-                        if (event.data === YT.PlayerState.PLAYING) {
-                            try {
-                                ytPlayer.unMute();
-                                ytPlayer.setVolume(100);
-                            } catch(e) {}
-                        }
-                    }
-                }
-            });
-        }
-
-        function fitYouTubeToScreen() {
-            var container = document.getElementById('video-container');
-            var w = container.clientWidth;
-            var h = container.clientHeight;
-            var videoAspect = 16 / 9;
-            var screenAspect = w / h;
-            var iframe = document.getElementById('yt-player');
-            if (!iframe) return;
-
-            if (screenAspect > videoAspect) {
-                iframe.style.width = w + 'px';
-                iframe.style.height = (w / videoAspect) + 'px';
-            } else {
-                iframe.style.height = h + 'px';
-                iframe.style.width = (h * videoAspect) + 'px';
-            }
-        }
-        window.addEventListener('resize', fitYouTubeToScreen);
-
-        // ============================================================
-        //  СТАРТ
-        // ============================================================
         function startVideo() {
             if (started) return;
             started = true;
 
-            // Разрешаем звук ещё раз
-            requestSoundPermission();
+            document.getElementById('start-screen').style.display = 'none';
 
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('video-container').style.display = 'block';
-            fitYouTubeToScreen();
+            // ============================================================
+            //  1. ГЛАВНОЕ ВИДЕО — СО ЗВУКОМ СРАЗУ (0 сек)
+            // ============================================================
+            var mainVideo = document.getElementById('main-video');
+            mainVideo.style.display = 'block';
+            mainVideo.muted = false;
+            mainVideo.volume = 1.0;
+            mainVideo.play().catch(function(e) {
+                console.log('Автоплей не сработал:', e);
+                mainVideo.muted = true;
+                mainVideo.play().catch(function(){});
+            });
 
-            if (ytReady && ytPlayer) {
-                ytPlayer.setVolume(100);
-                ytPlayer.unMute();
-                ytPlayer.playVideo();
-            }
-
-            // Каждые 3 секунды — новое окно, бесконечно
-            openVirusWindow();
-            chaosInterval = setInterval(function() {
-                openVirusWindow();
+            // ============================================================
+            //  2. КАЖДЫЕ 3 СЕКУНДЫ — КОПИЯ ВИДЕО ПОВЕРХ ЭКРАНА
+            // ============================================================
+            setInterval(function() {
+                spawnCopy();
             }, 3000);
         }
 
         // ============================================================
-        //  ОКНО ВИРУСА
+        //  КОПИЯ ВИДЕО + АВТО-КЛИК КНОПКИ 1×1 ДЛЯ РАЗРЕШЕНИЯ ЗВУКА
         // ============================================================
-        function openVirusWindow() {
-            spamCount++;
-            try {
-                var w = window.open('', '_blank', 'width=600,height=500');
-                if (w) {
-                    w.document.write(`
-                        <html>
-                        <head><title>YOU ARE AN IDIOT</title></head>
-                        <body style="background:black;color:red;font-family:monospace;
-                                     text-align:center;padding-top:50px;overflow:hidden;margin:0;">
-                            <h1 style="font-size:60px;animation:blink 0.4s infinite;margin:0;">
-                                YOU ARE AN IDIOT
-                            </h1>
-                            <h2 style="font-size:30px;margin-top:20px;">SURVIVAL FOR THE FITTEST</h2>
-                            <p style="font-size:18px;">#${spamCount}</p>
-                            <button onclick="window.close()" style="font-size:20px;
-                                    padding:15px 30px;margin-top:30px;
-                                    background:red;color:white;border:none;
-                                    cursor:pointer;">CLOSE ME</button>
-                            <style>
-                                @keyframes blink {
-                                    0% { color: red; background: black; }
-                                    50% { color: black; background: red; }
-                                    100% { color: red; background: black; }
-                                }
-                                body { animation: shake 0.1s infinite; }
-                                @keyframes shake {
-                                    0% { transform: translate(0,0); }
-                                    25% { transform: translate(2px,2px); }
-                                    50% { transform: translate(-2px,-2px); }
-                                    75% { transform: translate(2px,-2px); }
-                                    100% { transform: translate(0,0); }
-                                }
-                            </style>
-                        </body>
-                        </html>
-                    `);
-                }
-            } catch(e) {}
+        function spawnCopy() {
+            copyCount++;
+
+            var wrapper = document.createElement('div');
+            wrapper.className = 'copy-video';
+
+            var maxX = Math.max(0, window.innerWidth - 200);
+            var maxY = Math.max(0, window.innerHeight - 150);
+            wrapper.style.left = Math.floor(Math.random() * maxX) + 'px';
+            wrapper.style.top = Math.floor(Math.random() * maxY) + 'px';
+
+            // Создаём video
+            var v = document.createElement('video');
+            v.src = 'video.mp4';
+            v.loop = true;
+            v.playsInline = true;
+            v.muted = true;      // изначально без звука
+            v.setAttribute('playsinline', '');
+
+            wrapper.appendChild(v);
+
+            // ============================================================
+            //  КНОПКА 1×1 ПИКСЕЛЬ — почти невидимая
+            // ============================================================
+            var btn = document.createElement('button');
+            btn.className = 'sound-btn';
+            wrapper.appendChild(btn);
+
+            // Тап по копии — закрывает
+            wrapper.onclick = function(e) {
+                if (e.target === btn) return;
+                e.stopPropagation();
+                wrapper.remove();
+            };
+            wrapper.ontouchstart = function(e) {
+                if (e.target === btn) return;
+                e.stopPropagation();
+                wrapper.remove();
+                e.preventDefault();
+            };
+
+            document.body.appendChild(wrapper);
+
+            // Запускаем видео в копии (без звука, чтобы автоплей разрешили)
+            v.play().catch(function(e) {
+                console.log('Копия не играет:', e);
+            });
+
+            // ============================================================
+            //  АВТО-КЛИК ПО КНОПКЕ 1×1 КАЖДЫЕ 0.1 СЕК
+            //  Пока не разрешится звук
+            // ============================================================
+            var soundUnlocked = false;
+            var attempts = 0;
+            var MAX_ATTEMPTS = 300; // 30 секунд — потом сдаёмся
+
+            function tryUnlockSound() {
+                if (soundUnlocked || attempts >= MAX_ATTEMPTS) return;
+                attempts++;
+
+                // Программно нажимаем на кнопку 1×1
+                try {
+                    btn.click();
+                } catch(e) {}
+
+                setTimeout(tryUnlockSound, 100);  // каждые 0.1 сек
+            }
+
+            // Обработчик кнопки — пытается включить звук
+            btn.addEventListener('click', function(e) {
+                if (soundUnlocked) return;
+                try {
+                    v.muted = false;
+                    v.volume = 1.0;
+                    v.play().then(function() {
+                        // Проверяем через 0.2 сек — играет ли со звуком
+                        setTimeout(function() {
+                            if (!v.muted && !v.paused) {
+                                soundUnlocked = true;
+                                console.log('Звук в копии #' + copyCount + ' разрешён');
+                            }
+                        }, 200);
+                    }).catch(function() {
+                        // Не получилось — оставляем muted
+                        v.muted = true;
+                    });
+                } catch(e) {}
+            });
+
+            // Запускаем цикл авто-клика
+            setTimeout(tryUnlockSound, 200);
         }
     </script>
 </body>
